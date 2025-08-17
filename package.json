@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "leaflet": "^1.9.4",
+    "leaflet-arc": "^1.0.2",
     "react-leaflet": "^5.0.0",
     "react-scripts": "5.0.1"
   },
