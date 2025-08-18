@@ -7,9 +7,6 @@ import L from 'leaflet';
 import { Airport } from '@/data/airport';
 import { Flight } from '@/data/flight';
 
-// 动态导入 leaflet-arc
-import('leaflet-arc');
-
 interface FlightMapProps {
   flights: Flight[];
   airports: Airport[];
@@ -18,12 +15,22 @@ interface FlightMapProps {
 const FlightMap: React.FC<FlightMapProps> = ({ flights, airports }) => {
   const center: [number, number] = [39.9042, 116.4074];
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isArcLoaded, setIsArcLoaded] = useState(false); // 1. 新增状态来追踪 leaflet-arc 是否加载
   const mapRef = useRef<L.Map | null>(null);
   const pathsRef = useRef<L.Polyline[]>([]);
 
   const getAirportByCode = (code: string): Airport | undefined => {
     return airports.find(airport => airport.code === code);
   };
+
+  // 2. 使用 useEffect 专门加载 leaflet-arc
+  useEffect(() => {
+    import('leaflet-arc')
+      .then(() => {
+        setIsArcLoaded(true);
+      })
+      .catch(err => console.error("Failed to load leaflet-arc", err));
+  }, []);
 
   useEffect(() => {
     const darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -33,39 +40,38 @@ const FlightMap: React.FC<FlightMapProps> = ({ flights, airports }) => {
     return () => darkModeMediaQuery.removeEventListener('change', handleChange);
   }, []);
 
+  // 3. 在绘制航线的 useEffect 中，增加对 isArcLoaded 的依赖
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    // 确保地图和 leaflet-arc 都已准备就绪
+    if (!map || !isArcLoaded) return;
 
     const bounds = L.latLngBounds(L.latLng(-85, -180), L.latLng(85, 180));
     map.setMaxBounds(bounds);
 
-    setTimeout(() => {
-      if (L.Polyline && (L.Polyline as any).Arc) {
-        pathsRef.current.forEach(path => path.remove());
-        pathsRef.current = [];
+    // 移除旧的 setTimeout，直接绘制
+    pathsRef.current.forEach(path => path.remove());
+    pathsRef.current = [];
 
-        flights.forEach(flight => {
-          const departureAirport = getAirportByCode(flight.departureAirport);
-          const arrivalAirport = getAirportByCode(flight.arrivalAirport);
+    flights.forEach(flight => {
+      const departureAirport = getAirportByCode(flight.departureAirport);
+      const arrivalAirport = getAirportByCode(flight.arrivalAirport);
 
-          if (departureAirport && arrivalAirport) {
-            const path = (L.Polyline as any).Arc(
-              [departureAirport.latitude, departureAirport.longitude],
-              [arrivalAirport.latitude, arrivalAirport.longitude],
-              {
-                color: '#3b82f6',
-                weight: 2,
-                opacity: 0.7,
-                interactive: false,
-              }
-            ).addTo(map);
-            pathsRef.current.push(path);
+      if (departureAirport && arrivalAirport) {
+        const path = (L.Polyline as any).Arc(
+          [departureAirport.latitude, departureAirport.longitude],
+          [arrivalAirport.latitude, arrivalAirport.longitude],
+          {
+            color: '#3b82f6',
+            weight: 2,
+            opacity: 0.7,
+            interactive: false,
           }
-        });
+        ).addTo(map);
+        pathsRef.current.push(path);
       }
-    }, 100);
-  }, [flights, airports]);
+    });
+  }, [flights, airports, isArcLoaded]); // 4. 将 isArcLoaded 添加到依赖数组
 
   return (
     <div style={{ height: '100vh', width: '100%' }}>
