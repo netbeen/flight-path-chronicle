@@ -41,4 +41,29 @@ export const FLIGHTS: Flight[] = [
     departureAirport: 'XIY',
     arrivalAirport: 'PEK',
   },
+  // 新增的往返航班数据
+  {
+    flightNumber: '3U8721',
+    departureTime: '2023-06-01T10:00:00',
+    departureAirport: 'CTU',
+    arrivalAirport: 'CAN',
+  },
+  {
+    flightNumber: 'CZ3404',
+    departureTime: '2023-06-01T15:00:00',
+    departureAirport: 'CAN',
+    arrivalAirport: 'CTU',
+  },
+  {
+    flightNumber: 'ZH9401',
+    departureTime: '2023-06-03T11:30:00',
+    departureAirport: 'CTU',
+    arrivalAirport: 'CAN',
+  },
+  {
+    flightNumber: 'OQ2351',
+    departureTime: '2023-06-03T18:00:00',
+    departureAirport: 'CAN',
+    arrivalAirport: 'CTU',
+  },
 ];
