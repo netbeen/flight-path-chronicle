@@ -33,15 +33,12 @@ const FlightMap: React.FC<FlightMapProps> = ({ flights, airports }) => {
     return () => darkModeMediaQuery.removeEventListener('change', handleChange);
   }, []);
 
-  const handleMapLoad = (map: L.Map) => {
-    mapRef.current = map;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
     const bounds = L.latLngBounds(L.latLng(-85, -180), L.latLng(85, 180));
     map.setMaxBounds(bounds);
-  };
-
-  useEffect(() => {
-    if (!mapRef.current) return;
-    const map = mapRef.current;
 
     setTimeout(() => {
       if (L.Polyline && (L.Polyline as any).Arc) {
@@ -76,7 +73,7 @@ const FlightMap: React.FC<FlightMapProps> = ({ flights, airports }) => {
         center={center}
         zoom={3}
         style={{ height: '100%', width: '100%', backgroundColor: isDarkMode ? '#2d3748' : '#ffffff' }}
-        whenReady={({ target }) => handleMapLoad(target as L.Map)}
+        ref={mapRef}
         maxBounds={L.latLngBounds(L.latLng(-85, -180), L.latLng(85, 180))}
         maxBoundsViscosity={1.0}
       >
