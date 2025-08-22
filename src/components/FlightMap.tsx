@@ -5,8 +5,9 @@ import { MapContainer, TileLayer } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import 'leaflet-polylinedecorator';
-import { Airport } from '@/data/airport';
-import { Flight } from '@/data/flight';
+import { Airport, getAirportByCode } from '@/data';
+import { Flight } from '@/data';
+import { processFlights } from '@/data';
 
 // --- Helper functions for Bezier curve calculation ---
 
@@ -72,102 +73,76 @@ const FlightMap: React.FC<FlightMapProps> = ({ flights, airports }) => {
     });
     pathsRef.current.clear();
 
-    const flightGroups = new Map<string, Flight[]>();
-    flights.forEach(flight => {
-      const key = [flight.departureAirport, flight.arrivalAirport].sort().join('-');
-      if (!flightGroups.has(key)) {
-        flightGroups.set(key, []);
-      }
-      flightGroups.get(key)!.push(flight);
-    });
+    // 使用新的数据处理器来获取带有可视化属性的航班数据
+    const processedFlights = processFlights(flights, airports);
 
-    flightGroups.forEach(group => {
-      const directions = new Map<string, Flight[]>();
-      group.forEach(flight => {
-        const directionKey = `${flight.departureAirport}->${flight.arrivalAirport}`;
-        if (!directions.has(directionKey)) {
-          directions.set(directionKey, []);
-        }
-        directions.get(directionKey)!.push(flight);
-      });
+    processedFlights.forEach(flight => {
+      const departureAirport = getAirportByCode(flight.departureAirport);
+      const arrivalAirport = getAirportByCode(flight.arrivalAirport);
 
-      directions.forEach((directionFlights, directionKey) => {
-        const baseCurvature = 0.15;
-        const isReturnFlight = directionKey.split('->')[0] > directionKey.split('->')[1];
+      if (departureAirport && arrivalAirport) {
+        const p0 = L.latLng(departureAirport.latitude, departureAirport.longitude);
+        const p2 = L.latLng(arrivalAirport.latitude, arrivalAirport.longitude);
+        
+        // 直接使用处理后的曲率
+        const controlPoint = getControlPoint(p0, p2, flight.curvature);
+        const polylinePoints = getQuadraticBezierPoints(p0, controlPoint, p2);
 
-        directionFlights.forEach((flight, index) => {
-          const departureAirport = getAirportByCode(flight.departureAirport);
-          const arrivalAirport = getAirportByCode(flight.arrivalAirport);
+        const path = L.polyline(polylinePoints, {
+          color: flight.color, // 使用处理后的颜色
+          weight: 2,
+          opacity: 0.7,
+          interactive: false,
+        }).addTo(map);
 
-          if (departureAirport && arrivalAirport) {
-            const p0 = L.latLng(departureAirport.latitude, departureAirport.longitude);
-            const p2 = L.latLng(arrivalAirport.latitude, arrivalAirport.longitude);
-            
-            let curvature = (index + 1) * baseCurvature;
-            if (isReturnFlight) {
-              curvature = -curvature;
-            }
+        const hitArea = L.polyline(polylinePoints, {
+          color: 'transparent',
+          weight: 20,
+          opacity: 0,
+          interactive: true,
+        }).addTo(map);
 
-            const controlPoint = getControlPoint(p0, p2, curvature);
-            const polylinePoints = getQuadraticBezierPoints(p0, controlPoint, p2);
-
-            const path = L.polyline(polylinePoints, {
-              color: '#3b82f6',
-              weight: 2,
-              opacity: 0.7,
-              interactive: false,
-            }).addTo(map);
-
-            const hitArea = L.polyline(polylinePoints, {
-              color: 'transparent',
-              weight: 20,
-              opacity: 0,
-              interactive: true,
-            }).addTo(map);
-
-            const decorator = L.polylineDecorator(path, {
-              patterns: [
-                {
-                  offset: '50%',
-                  repeat: 0,
-                  // 1. 修改箭头符号的定义
-                  symbol: L.Symbol.arrowHead({
-                    pixelSize: 10,     // 稍微增大尺寸，使其更清晰
-                    polygon: true,     // 将箭头绘制为闭合的多边形（三角形）
-                    pathOptions: {
-                      stroke: false,   // 移除边框，使其成为一个实心形状
-                      fill: true,      // 允许填充
-                      fillColor: '#3b82f6', // 使用与航线相同的颜色进行填充
-                      fillOpacity: 1,  // 完全不透明
-                    },
-                  }),
+        const decorator = L.polylineDecorator(path, {
+          patterns: [
+            {
+              offset: '50%',
+              repeat: 0,
+              // 1. 修改箭头符号的定义
+              symbol: L.Symbol.arrowHead({
+                pixelSize: 10,
+                polygon: true,
+                pathOptions: {
+                  stroke: false,
+                  fill: true,
+                  fillColor: flight.color, // 使用处理后的颜色
+                  fillOpacity: 1,
                 },
-              ],
-            }).addTo(map);
-            
-            const popupContent = `
-              <div>
-                <h3>Flight Details</h3>
-                <p><strong>Flight No:</strong> ${flight.flightNumber}</p>
-                <p><strong>From:</strong> ${departureAirport.name} (${departureAirport.code})</p>
-                <p><strong>To:</strong> ${arrivalAirport.name} (${arrivalAirport.code})</p>
-                <p><strong>Departure:</strong> ${new Date(flight.departureTime).toLocaleString()}</p>
-              </div>
-            `;
+              }),
+            },
+          ],
+        }).addTo(map);
+        
+        const popupContent = `
+          <div>
+            <h3>Flight Details</h3>
+            <p><strong>Flight No:</strong> ${flight.flightNumber}</p>
+            <p><strong>From:</strong> ${departureAirport.name} (${departureAirport.code})</p>
+            <p><strong>To:</strong> ${arrivalAirport.name} (${arrivalAirport.code})</p>
+            <p><strong>Departure:</strong> ${new Date(flight.departureTime).toLocaleString()}</p>
+          </div>
+        `;
 
-            hitArea.bindPopup(popupContent);
+        hitArea.bindPopup(popupContent);
 
-            hitArea.on('mouseover', () => {
-              path.setStyle({ weight: 4, color: '#2563eb' });
-            });
-            hitArea.on('mouseout', () => {
-              path.setStyle({ weight: 2, color: '#3b82f6' });
-            });
-
-            pathsRef.current.set(flight.flightNumber, { path, decorator, hitArea });
-          }
+        hitArea.on('mouseover', () => {
+          path.setStyle({ weight: 4, color: flight.color, opacity: 1 });
         });
-      });
+        hitArea.on('mouseout', () => {
+          path.setStyle({ weight: 2, color: flight.color, opacity: 0.7 });
+        });
+
+        pathsRef.current.set(flight.flightNumber, { path, decorator, hitArea });
+      }
     });
   }, [map, flights, airports]); // 3. 添加 map 到依赖数组
 
