@@ -11,16 +11,37 @@ import { processFlights } from '@/data';
 
 // --- Helper functions for Bezier curve calculation ---
 
-const getControlPoint = (p0: L.LatLng, p2: L.LatLng, curvature: number) => {
-  const midpoint = L.latLng((p0.lat + p2.lat) / 2, (p0.lng + p2.lng) / 2);
-  const dx = p2.lng - p0.lng;
-  const dy = p2.lat - p0.lat;
-  const perpendicular = L.latLng(-dy, dx);
+const getControlPoint = (p0: L.LatLng, p2: L.LatLng, curvature: number, map: L.Map) => {
+  // 将经纬度坐标投影到地图的像素坐标系
+  const p0_proj = map.project(p0);
+  const p2_proj = map.project(p2);
+
+  // 在像素坐标系中计算中点
+  const midpoint_proj = p0_proj.add(p2_proj).divideBy(2);
   
-  return L.latLng(
-    midpoint.lat + curvature * perpendicular.lat,
-    midpoint.lng + curvature * perpendicular.lng
+  // 计算p0到p2的向量
+  const dx = p2_proj.x - p0_proj.x;
+  const dy = p2_proj.y - p0_proj.y;
+
+  // 计算标准化的垂直向量
+  const len = Math.sqrt(dx * dx + dy * dy);
+  if (len === 0) {
+    // 如果起点和终点相同，直接返回中点
+    return map.unproject(midpoint_proj);
+  }
+  const nx = -dy / len;
+  const ny = dx / len;
+
+  // 曲率现在是航线长度的一个比例，这使得曲线的弯曲程度与航线距离成正比
+  const curve_pixel_distance = len * curvature;
+
+  const control_point_proj = L.point(
+    midpoint_proj.x + curve_pixel_distance * nx,
+    midpoint_proj.y + curve_pixel_distance * ny
   );
+
+  // 将计算出的控制点像素坐标反投影回经纬度坐标
+  return map.unproject(control_point_proj);
 };
 
 const getQuadraticBezierPoints = (p0: L.LatLng, p1: L.LatLng, p2: L.LatLng, numPoints = 50) => {
@@ -84,8 +105,8 @@ const FlightMap: React.FC<FlightMapProps> = ({ flights, airports }) => {
         const p0 = L.latLng(departureAirport.latitude, departureAirport.longitude);
         const p2 = L.latLng(arrivalAirport.latitude, arrivalAirport.longitude);
         
-        // 直接使用处理后的曲率
-        const controlPoint = getControlPoint(p0, p2, flight.curvature);
+        // 直接使用处理后的曲率，并传入 map 实例以进行投影计算
+        const controlPoint = getControlPoint(p0, p2, flight.curvature, map);
         const polylinePoints = getQuadraticBezierPoints(p0, controlPoint, p2);
 
         const path = L.polyline(polylinePoints, {
