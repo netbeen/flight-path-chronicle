@@ -11,3 +11,19 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+/* 机场高亮点的辉光效果 */
+.airport-highlight {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  /* 调整径向渐变，让亮黄色核心更小，渐变更急促 */
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 0, 0.9) 0%,   /* 中心为亮黄色 */
+    rgba(255, 165, 0, 0.7) 30%, /* 缩小亮色区域，加快向橙色过渡 */
+    rgba(255, 140, 0, 0) 60%    /* 加快向透明过渡 */
+  );
+  /* 减小外发光的范围和模糊半径，使其更收敛 */
+  box-shadow: 0 0 8px 3px rgba(255, 223, 0, 0.4);
+}

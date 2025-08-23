@@ -7,7 +7,7 @@ import L from 'leaflet';
 import 'leaflet-polylinedecorator';
 import { Airport, getAirportByCode } from '@/data';
 import { Flight } from '@/data';
-import { processFlights } from '@/data';
+import { processFlights, calculateAirportActivity } from '@/data';
 
 // --- Helper functions for Bezier curve calculation ---
 
@@ -67,6 +67,7 @@ const FlightMap: React.FC<FlightMapProps> = ({ flights, airports }) => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [map, setMap] = useState<L.Map | null>(null);
   const pathsRef = useRef<Map<string, { path: L.Polyline; decorator: L.PolylineDecorator; hitArea: L.Polyline }>>(new Map());
+  const airportMarkersRef = useRef<L.Marker[]>([]);
 
   const getAirportByCode = (code: string): Airport | undefined => {
     return airports.find(airport => airport.code === code);
@@ -92,20 +93,51 @@ const FlightMap: React.FC<FlightMapProps> = ({ flights, airports }) => {
   useEffect(() => {
     if (!map) return; // 只有当地图实例准备好后才执行
 
-    // 强制将视图设置在新的 [0, 360] 坐标系的中心
-    map.setView([30, 180], 2);
+    // 创建一个自定义的 Pane 用于渲染机场高亮点，并设置高 zIndex
+    map.createPane('airportHighlights');
+    const highlightPane = map.getPane('airportHighlights');
+    if (highlightPane) {
+      highlightPane.style.zIndex = '650';
+    }
 
-    const bounds = L.latLngBounds(L.latLng(-85, -Infinity), L.latLng(85, Infinity));
-    map.setMaxBounds(bounds);
-
+    // 清理旧的航线和高亮点
     pathsRef.current.forEach(({ path, decorator, hitArea }) => {
       path.remove();
       decorator.remove();
       hitArea.remove();
     });
     pathsRef.current.clear();
+    airportMarkersRef.current.forEach(marker => marker.remove());
+    airportMarkersRef.current = [];
 
-    // 使用新的数据处理器来获取带有可视化属性的航班数据
+    // --- 绘制机场高亮点 ---
+    const airportActivity = calculateAirportActivity(flights);
+    airportActivity.forEach((count, code) => {
+      const airport = getAirportByCode(code);
+      if (airport) {
+        const size = 10 + count * 2; // 根据起降次数动态计算大小
+        const icon = L.divIcon({
+          html: `<div class="airport-highlight"></div>`,
+          className: '',
+          iconSize: [size, size],
+          iconAnchor: [size / 2, size / 2],
+        });
+
+        // 为了适配可无限滚动的世界地图，我们在三个“世界”中都绘制标记
+        // （当前世界、左边的世界和右边的世界）
+        // 这确保了高亮点与跨越日界线的航线终点能够正确匹配
+        [-360, 0, 360].forEach(lngOffset => {
+          const marker = L.marker([airport.latitude, airport.longitude + lngOffset], {
+            icon: icon,
+            pane: 'airportHighlights', // 在自定义 Pane 中渲染
+            interactive: false,
+          }).addTo(map);
+          airportMarkersRef.current.push(marker);
+        });
+      }
+    });
+
+    // --- 绘制航线 ---
     const processedFlights = processFlights(flights, airports);
 
     processedFlights.forEach(flight => {

@@ -13,6 +13,20 @@ export interface ProcessedFlight extends Flight {
   };
 }
 
+/**
+ * 计算机场的起降次数
+ * @param flights 原始航班数据列表
+ * @returns 返回一个Map，key为机场代码，value为总起降次数
+ */
+export const calculateAirportActivity = (flights: Flight[]): Map<string, number> => {
+  const activityMap = new Map<string, number>();
+  flights.forEach(flight => {
+    activityMap.set(flight.departureAirport, (activityMap.get(flight.departureAirport) || 0) + 1);
+    activityMap.set(flight.arrivalAirport, (activityMap.get(flight.arrivalAirport) || 0) + 1);
+  });
+  return activityMap;
+};
+
 // 定义一个函数，根据出发和到达机场的纬度和经度来判断航线方向
 const getDirection = (departureAirport: Airport, arrivalAirport: Airport): 'outgoing' | 'returning' => {
   // 规则：纬度上升为去程，纬度下降为返程
