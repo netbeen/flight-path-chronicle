@@ -62,9 +62,9 @@ interface FlightMapProps {
 }
 
 const FlightMap: React.FC<FlightMapProps> = ({ flights, airports }) => {
-  const center: [number, number] = [39.9042, 116.4074];
+  // 将地图中心点调整为太平洋，以实现“亚洲在左，美洲在右”的布局
+  const center: [number, number] = [30, -150];
   const [isDarkMode, setIsDarkMode] = useState(false);
-  // 1. 使用 useState 来存储地图实例，确保时机正确
   const [map, setMap] = useState<L.Map | null>(null);
   const pathsRef = useRef<Map<string, { path: L.Polyline; decorator: L.PolylineDecorator; hitArea: L.Polyline }>>(new Map());
 
@@ -80,11 +80,22 @@ const FlightMap: React.FC<FlightMapProps> = ({ flights, airports }) => {
     return () => darkModeMediaQuery.removeEventListener('change', handleChange);
   }, []);
 
+  // 使用 useEffect 强制设置地图的初始视图，确保太平洋为中心
+  useEffect(() => {
+    if (map) {
+      // 将视图中心设置为 [-150, 30]，并设置缩放级别
+      map.setView([30, -150], 2);
+    }
+  }, [map]); // 此效果仅在 map 实例准备好后运行一次
+
   // 2. 将绘图逻辑移入一个单独的 useEffect，并依赖于 map 状态
   useEffect(() => {
     if (!map) return; // 只有当地图实例准备好后才执行
 
-    const bounds = L.latLngBounds(L.latLng(-85, -180), L.latLng(85, 180));
+    // 强制将视图设置在新的 [0, 360] 坐标系的中心
+    map.setView([30, 180], 2);
+
+    const bounds = L.latLngBounds(L.latLng(-85, -Infinity), L.latLng(85, Infinity));
     map.setMaxBounds(bounds);
 
     pathsRef.current.forEach(({ path, decorator, hitArea }) => {
@@ -102,8 +113,15 @@ const FlightMap: React.FC<FlightMapProps> = ({ flights, airports }) => {
       const arrivalAirport = getAirportByCode(flight.arrivalAirport);
 
       if (departureAirport && arrivalAirport) {
-        const p0 = L.latLng(departureAirport.latitude, departureAirport.longitude);
-        const p2 = L.latLng(arrivalAirport.latitude, arrivalAirport.longitude);
+        // 使用转换后的坐标进行绘图
+        const departureLongitude = departureAirport.longitude < 0 ? departureAirport.longitude + 360 : departureAirport.longitude;
+        const arrivalLongitude = arrivalAirport.longitude < 0 ? arrivalAirport.longitude + 360 : arrivalAirport.longitude;
+
+        const p0 = L.latLng(departureAirport.latitude, departureLongitude);
+        // 优先使用修正后的到达点坐标
+        const p2 = flight.arrivalAirportModified
+          ? L.latLng(flight.arrivalAirportModified.latitude, flight.arrivalAirportModified.longitude)
+          : L.latLng(arrivalAirport.latitude, arrivalLongitude);
         
         // 直接使用处理后的曲率，并传入 map 实例以进行投影计算
         const controlPoint = getControlPoint(p0, p2, flight.curvature, map);
@@ -171,20 +189,22 @@ const FlightMap: React.FC<FlightMapProps> = ({ flights, airports }) => {
     <div style={{ height: '100vh', width: '100%' }}>
       <MapContainer
         center={center}
-        zoom={3}
+        zoom={2}
         style={{ height: '100%', width: '100%', backgroundColor: isDarkMode ? '#2d3748' : '#ffffff' }}
-        // 4. 将 setMap 作为 ref 回调函数传递
         ref={setMap}
-        maxBounds={L.latLngBounds(L.latLng(-85, -180), L.latLng(85, 180))}
         maxBoundsViscosity={1.0}
+        // 使用 worldCopyJump 来创建一个连续的、可滚动的世界地图
+        // 这是实现太平洋中心视图的标准方式
+        worldCopyJump={true}
       >
         <TileLayer
           url={
             isDarkMode
               ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-              : 'https://s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+              : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
           }
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+          // 移除 noWrap={true}，因为它导致了地图只显示一半的问题
         />
       </MapContainer>
     </div>

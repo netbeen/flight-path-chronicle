@@ -6,6 +6,11 @@ export interface ProcessedFlight extends Flight {
   direction: 'outgoing' | 'returning';
   color: string;
   curvature: number;
+  // 为跨日界线航线增加一个可选的、经度调整后的目标机场坐标
+  arrivalAirportModified?: {
+    latitude: number;
+    longitude: number;
+  };
 }
 
 // 定义一个函数，根据出发和到达机场的纬度和经度来判断航线方向
@@ -47,30 +52,43 @@ export const processFlights = (flights: Flight[], airports: Airport[]): Processe
 
   // 2. 遍历每个航线组，计算其属性
   flightGroups.forEach((group, key) => {
-    const departureAirport = getAirportByCode(group[0].departureAirport);
-    const arrivalAirport = getAirportByCode(group[0].arrivalAirport);
+    const departureAirportRaw = getAirportByCode(group[0].departureAirport);
+    const arrivalAirportRaw = getAirportByCode(group[0].arrivalAirport);
 
-    if (departureAirport && arrivalAirport) {
+    if (departureAirportRaw && arrivalAirportRaw) {
+      // 将所有经度转换到 [0, 360] 的范围
+      const departureAirport = { ...departureAirportRaw, longitude: departureAirportRaw.longitude < 0 ? departureAirportRaw.longitude + 360 : departureAirportRaw.longitude };
+      const arrivalAirport = { ...arrivalAirportRaw, longitude: arrivalAirportRaw.longitude < 0 ? arrivalAirportRaw.longitude + 360 : arrivalAirportRaw.longitude };
+
       const direction = getDirection(departureAirport, arrivalAirport);
       const color = direction === 'outgoing' ? '#f87171' : '#60a5fa'; // 去程红色，返程蓝色
 
-      // 3. 为组内的每个航班分配递增的曲率
+      // 为组内的每个航班分配递增的曲率，并处理跨日界线的情况
       group.forEach((flight, index) => {
-        // 旧逻辑：返程使用负曲率，导致了线路重叠
-        // const curvatureSign = direction === 'outgoing' ? 1 : -1;
-        // const curvature = curvatureSign * (index + 1) * baseCurvature;
-
-        // 新逻辑：始终使用正曲率。
-        // getControlPoint 函数在计算返程航线时，由于起点和终点互换，
-        // 其计算出的垂直向量方向会自然反转，这使得正曲率能将返程航线绘制在去程航线的另一侧，
-        // 从而形成视觉上分离的、对称的弧线效果。
         const curvature = (index + 1) * baseCurvature;
+
+        let arrivalAirportModified;
+        // 在新的 [0, 360] 坐标系下，日界线变成了 180 度经线
+        const deltaLongitude = arrivalAirport.longitude - departureAirport.longitude;
+
+        // 如果经度差大于180度，说明航线“绕了远路”，需要修正
+        if (Math.abs(deltaLongitude) > 180) {
+          const adjustedLongitude =
+            deltaLongitude > 0
+              ? arrivalAirport.longitude - 360
+              : arrivalAirport.longitude + 360;
+          arrivalAirportModified = {
+            latitude: arrivalAirport.latitude,
+            longitude: adjustedLongitude,
+          };
+        }
 
         processedFlights.push({
           ...flight,
           direction,
           color,
           curvature,
+          arrivalAirportModified,
         });
       });
     }
