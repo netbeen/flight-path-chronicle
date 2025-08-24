@@ -85,3 +85,33 @@ code {
 .flight-stats-panel .stats-destinations li:last-child {
   border-bottom: none;
 }
+
+
+/* Leaflet UI Dark Mode Overrides */
+.leaflet-bar a,
+.leaflet-bar a:hover {
+  background-color: #2a2a2a !important; /* 深色背景 */
+  border: 1px solid #555 !important;
+  color: #f0f0f0 !important; /* 浅色图标 */
+  border-radius: 4px; /* 添加圆角以匹配整体风格 */
+}
+
+.leaflet-bar a:hover {
+  background-color: #444 !important; /* 悬停时使用稍亮的背景色 */
+}
+
+.leaflet-bar a:first-child {
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+  margin-bottom: 4px; /* 增加按钮之间的间距 */
+}
+
+.leaflet-bar a:last-child {
+  border-bottom-left-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
+
+.leaflet-control-zoom {
+  border: none !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important; /* 匹配统计面板的阴影 */
+}
