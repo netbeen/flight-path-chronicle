@@ -1,5 +1,6 @@
 import dynamic from 'next/dynamic';
 import { FLIGHTS, AIRPORTS } from '@/data';
+import FlightStats from '@/components/FlightStats';
 
 // 使用 next/dynamic 动态导入 FlightMap 组件，并禁用 SSR
 const FlightMap = dynamic(() => import('@/components/FlightMap'), { 
@@ -12,6 +13,7 @@ export default function Home() {
   return (
     <main>
       <FlightMap flights={FLIGHTS} airports={AIRPORTS} />
+      <FlightStats flights={FLIGHTS} airports={AIRPORTS} />
     </main>
   );
 }

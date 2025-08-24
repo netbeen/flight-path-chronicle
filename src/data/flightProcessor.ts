@@ -110,3 +110,80 @@ export const processFlights = (flights: Flight[], airports: Airport[]): Processe
 
   return processedFlights;
 };
+
+
+/**
+ * 使用 Haversine 公式计算两个经纬度坐标点之间的距离（单位：公里）
+ * @param lat1 第一个点的纬度
+ * @param lon1 第一个点的经度
+ * @param lat2 第二个点的纬度
+ * @param lon2 第二个点的经度
+ * @returns 返回两点间的距离（公里）
+ */
+const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+  const R = 6371; // 地球平均半径（公里）
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
+
+export interface FlightStatistics {
+  totalFlights: number;
+  totalDistance: number;
+  topDestinations: {
+    code: string;
+    name: string;
+    count: number;
+  }[];
+}
+
+/**
+ * 计算航班的各项统计数据
+ * @param flights 原始航班数据列表
+ * @param airports 机场数据列表
+ * @returns 返回一个包含统计数据的对象
+ */
+export const calculateFlightStatistics = (flights: Flight[], airports: Airport[]): FlightStatistics => {
+  const totalFlights = flights.length;
+  let totalDistance = 0;
+  const destinationCounts = new Map<string, number>();
+
+  flights.forEach(flight => {
+    const departureAirport = getAirportByCode(flight.departureAirport);
+    const arrivalAirport = getAirportByCode(flight.arrivalAirport);
+
+    if (departureAirport && arrivalAirport) {
+      totalDistance += getDistance(
+        departureAirport.latitude,
+        departureAirport.longitude,
+        arrivalAirport.latitude,
+        arrivalAirport.longitude
+      );
+    }
+
+    destinationCounts.set(flight.arrivalAirport, (destinationCounts.get(flight.arrivalAirport) || 0) + 1);
+  });
+
+  const topDestinations = Array.from(destinationCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5) // 只显示排名前5的目的地
+    .map(([code, count]) => {
+      const airport = getAirportByCode(code);
+      return {
+        code,
+        name: airport?.name || code,
+        count,
+      };
+    });
+
+  return {
+    totalFlights,
+    totalDistance: Math.round(totalDistance), // 四舍五入到整数
+    topDestinations,
+  };
+};
