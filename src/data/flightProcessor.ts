@@ -1,5 +1,5 @@
 import { Flight } from './flight';
-import { Airport, getAirportByCode } from './airport';
+import { Airport } from './airport';
 
 // 定义处理后航班的数据结构，增加了方向、颜色和曲率属性
 export interface ProcessedFlight extends Flight {
@@ -44,6 +44,19 @@ const getDirection = (departureAirport: Airport, arrivalAirport: Airport): 'outg
 };
 
 /**
+ * 构建机场索引表
+ * @param airports 机场数据列表
+ * @returns 以三字码为键的机场索引，便于 O(1) 查找
+ */
+const buildAirportIndex = (airports: Airport[]): Map<string, Airport> => {
+  const index = new Map<string, Airport>();
+  for (const airport of airports) {
+    index.set(airport.code, airport);
+  }
+  return index;
+};
+
+/**
  * 处理原始航班数据，为其增加方向、颜色和曲率等可视化属性
  * @param flights 原始航班数据列表
  * @param airports 机场数据列表
@@ -51,6 +64,7 @@ const getDirection = (departureAirport: Airport, arrivalAirport: Airport): 'outg
  */
 export const processFlights = (flights: Flight[], airports: Airport[]): ProcessedFlight[] => {
   const flightGroups = new Map<string, Flight[]>();
+  const airportIndex = buildAirportIndex(airports);
 
   // 1. 将航班按航线（例如 "PEK-PVG"）进行分组
   flights.forEach(flight => {
@@ -66,8 +80,8 @@ export const processFlights = (flights: Flight[], airports: Airport[]): Processe
 
   // 2. 遍历每个航线组，计算其属性
   flightGroups.forEach((group, key) => {
-    const departureAirportRaw = getAirportByCode(group[0].departureAirport);
-    const arrivalAirportRaw = getAirportByCode(group[0].arrivalAirport);
+    const departureAirportRaw = airportIndex.get(group[0].departureAirport);
+    const arrivalAirportRaw = airportIndex.get(group[0].arrivalAirport);
 
     if (departureAirportRaw && arrivalAirportRaw) {
       // 将所有经度转换到 [0, 360] 的范围
@@ -152,10 +166,11 @@ export const calculateFlightStatistics = (flights: Flight[], airports: Airport[]
   const totalFlights = flights.length;
   let totalDistance = 0;
   const destinationCounts = new Map<string, number>();
+  const airportIndex = buildAirportIndex(airports);
 
   flights.forEach(flight => {
-    const departureAirport = getAirportByCode(flight.departureAirport);
-    const arrivalAirport = getAirportByCode(flight.arrivalAirport);
+    const departureAirport = airportIndex.get(flight.departureAirport);
+    const arrivalAirport = airportIndex.get(flight.arrivalAirport);
 
     if (departureAirport && arrivalAirport) {
       totalDistance += getDistance(
@@ -173,7 +188,7 @@ export const calculateFlightStatistics = (flights: Flight[], airports: Airport[]
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5) // 只显示排名前5的目的地
     .map(([code, count]) => {
-      const airport = getAirportByCode(code);
+      const airport = airportIndex.get(code);
       return {
         code,
         name: airport?.name || code,

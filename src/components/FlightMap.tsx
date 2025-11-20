@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { MapContainer, TileLayer } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import 'leaflet-polylinedecorator';
-import { Airport, getAirportByCode } from '@/data';
+import { Airport } from '@/data';
 import { Flight } from '@/data';
 import { processFlights, calculateAirportActivity } from '@/data';
 
@@ -90,6 +90,18 @@ const FlightMap: React.FC<FlightMapProps> = ({ flights, airports }) => {
   }, [map]); // 此效果仅在 map 实例准备好后运行一次
 
   // 2. 将绘图逻辑移入一个单独的 useEffect，并依赖于 map 状态
+  /**
+   * 预计算机场活跃度
+   * 仅在 flights 变化时重新计算，降低绘制副作用中的重复开销
+   */
+  const airportActivity = useMemo(() => calculateAirportActivity(flights), [flights]);
+
+  /**
+   * 预处理航班曲线与跨日界线修正
+   * 仅在 flights 或 airports 变化时重新计算
+   */
+  const processedFlights = useMemo(() => processFlights(flights, airports), [flights, airports]);
+
   useEffect(() => {
     if (!map) return; // 只有当地图实例准备好后才执行
 
@@ -111,7 +123,6 @@ const FlightMap: React.FC<FlightMapProps> = ({ flights, airports }) => {
     airportMarkersRef.current = [];
 
     // --- 绘制机场高亮点 ---
-    const airportActivity = calculateAirportActivity(flights);
     airportActivity.forEach((count, code) => {
       const airport = getAirportByCode(code);
       if (airport) {
@@ -138,7 +149,6 @@ const FlightMap: React.FC<FlightMapProps> = ({ flights, airports }) => {
     });
 
     // --- 绘制航线 ---
-    const processedFlights = processFlights(flights, airports);
 
     processedFlights.forEach(flight => {
       const departureAirport = getAirportByCode(flight.departureAirport);
@@ -212,10 +222,10 @@ const FlightMap: React.FC<FlightMapProps> = ({ flights, airports }) => {
           path.setStyle({ weight: 2, color: flight.color, opacity: 0.7 });
         });
 
-        pathsRef.current.set(flight.flightNumber, { path, decorator, hitArea });
+        pathsRef.current.set(`${flight.flightNumber}-${flight.departureTime}`, { path, decorator, hitArea });
       }
     });
-  }, [map, flights, airports]); // 3. 添加 map 到依赖数组
+  }, [map, processedFlights, airportActivity, airports]); // 3. 添加 map 到依赖数组
 
   return (
     <div style={{ height: '100vh', width: '100%' }}>
