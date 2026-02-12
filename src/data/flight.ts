@@ -251,4 +251,22 @@ export const FLIGHTS: Flight[] = [
     departureAirport: 'PEK',
     arrivalAirport: 'HGH',
   },
+  {
+    flightNumber: 'CX959',
+    departureTime: '2025-12-07T11:25:00',
+    departureAirport: 'HGH',
+    arrivalAirport: 'HKG',
+  },
+  {
+    flightNumber: 'CX635',
+    departureTime: '2025-12-07T15:10:00',
+    departureAirport: 'HKG',
+    arrivalAirport: 'SIN',
+  },
+  {
+    flightNumber: 'MF8704',
+    departureTime: '2025-12-20T15:00:00',
+    departureAirport: 'SIN',
+    arrivalAirport: 'HGH',
+  },
 ];
