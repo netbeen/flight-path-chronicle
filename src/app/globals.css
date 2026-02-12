@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -28,64 +30,23 @@ code {
   box-shadow: 0 0 8px 3px rgba(255, 223, 0, 0.4);
 }
 
-
-/* 飞行统计面板的样式 */
-.flight-stats-panel {
-  position: absolute;
-  bottom: 20px;
-  left: 20px;
-  width: 280px;
-  background-color: rgba(20, 20, 20, 0.8); /* 深色半透明背景 */
-  color: #f0f0f0; /* 浅色文字 */
-  padding: 15px;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-  z-index: 1000; /* 确保在地图控件之上 */
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  font-size: 14px;
+/* 自定义滚动条样式 */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
 }
 
-.flight-stats-panel h3 {
-  margin-top: 0;
-  margin-bottom: 15px;
-  font-size: 18px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-  padding-bottom: 10px;
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
 }
 
-.flight-stats-panel .stats-item {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 10px;
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
 }
 
-.flight-stats-panel .stats-item span:last-child {
-  font-weight: bold;
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
-
-.flight-stats-panel .stats-destinations h4 {
-  margin-top: 20px;
-  margin-bottom: 10px;
-  font-size: 16px;
-}
-
-.flight-stats-panel .stats-destinations ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.flight-stats-panel .stats-destinations li {
-  display: flex;
-  justify-content: space-between;
-  padding: 5px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.flight-stats-panel .stats-destinations li:last-child {
-  border-bottom: none;
-}
-
 
 /* Leaflet UI Dark Mode Overrides */
 .leaflet-bar a,

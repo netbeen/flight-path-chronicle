@@ -202,3 +202,45 @@ export const calculateFlightStatistics = (flights: Flight[], airports: Airport[]
     topDestinations,
   };
 };
+
+/**
+ * 获取所有航班的年份列表
+ */
+export const getAvailableYears = (flights: Flight[]): string[] => {
+  const years = new Set<string>();
+  flights.forEach(flight => {
+    const year = new Date(flight.departureTime).getFullYear().toString();
+    years.add(year);
+  });
+  return Array.from(years).sort().reverse();
+};
+
+/**
+ * 获取所有航班的航空公司列表（根据航班号前缀）
+ */
+export const getAvailableAirlines = (flights: Flight[]): string[] => {
+  const airlines = new Set<string>();
+  flights.forEach(flight => {
+    // 假设前两个字符是航司代码
+    const airlineCode = flight.flightNumber.substring(0, 2);
+    airlines.add(airlineCode);
+  });
+  return Array.from(airlines).sort();
+};
+
+/**
+ * 获取航空公司名称映射（可选）
+ */
+export const AIRLINE_NAMES: Record<string, string> = {
+  'CA': '中国国际航空',
+  'MU': '中国东方航空',
+  'CZ': '中国南方航空',
+  'MF': '厦门航空',
+  'HU': '海南航空',
+  'CX': '国泰航空',
+  'SQ': '新加坡航空',
+  'DL': '达美航空',
+  'TR': '酷航',
+  'HX': '香港航空',
+  // 可以根据需要添加更多
+};

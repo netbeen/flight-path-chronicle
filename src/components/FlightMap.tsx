@@ -1,13 +1,12 @@
 'use client';
 
-import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
-import { MapContainer, TileLayer } from 'react-leaflet';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
+import { MapContainer, TileLayer, ZoomControl } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import 'leaflet-polylinedecorator';
-import { Airport } from '@/data';
-import { Flight } from '@/data';
-import { processFlights, calculateAirportActivity } from '@/data';
+import { Airport, Flight } from '@/data';
+import { processFlights, calculateAirportActivity, ProcessedFlight } from '@/data/flightProcessor';
 
 // --- Helper functions for Bezier curve calculation ---
 
@@ -59,9 +58,12 @@ const getQuadraticBezierPoints = (p0: L.LatLng, p1: L.LatLng, p2: L.LatLng, numP
 interface FlightMapProps {
   flights: Flight[];
   airports: Airport[];
+  onAirportClick: (airport: Airport) => void;
+  onFlightClick: (flight: ProcessedFlight) => void;
+  focusedLocation: { lat: number; lng: number; zoom?: number } | null;
 }
 
-const FlightMap: React.FC<FlightMapProps> = ({ flights, airports }) => {
+const FlightMap: React.FC<FlightMapProps> = ({ flights, airports, onAirportClick, onFlightClick, focusedLocation }) => {
   // 将地图中心点调整为太平洋，以实现“亚洲在左，美洲在右”的布局
   const center: [number, number] = [30, -150];
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -88,6 +90,15 @@ const FlightMap: React.FC<FlightMapProps> = ({ flights, airports }) => {
       map.setView([30, -150], 2);
     }
   }, [map]); // 此效果仅在 map 实例准备好后运行一次
+
+  // 监听焦点位置变化
+  useEffect(() => {
+    if (map && focusedLocation) {
+      map.flyTo([focusedLocation.lat, focusedLocation.lng], focusedLocation.zoom || 5, {
+        duration: 1.5
+      });
+    }
+  }, [map, focusedLocation]);
 
   // 2. 将绘图逻辑移入一个单独的 useEffect，并依赖于 map 状态
   /**
@@ -128,7 +139,7 @@ const FlightMap: React.FC<FlightMapProps> = ({ flights, airports }) => {
       if (airport) {
         const size = 10 + count * 2; // 根据起降次数动态计算大小
         const icon = L.divIcon({
-          html: `<div class="airport-highlight"></div>`,
+          html: `<div class="airport-highlight cursor-pointer"></div>`,
           className: '',
           iconSize: [size, size],
           iconAnchor: [size / 2, size / 2],
@@ -141,8 +152,13 @@ const FlightMap: React.FC<FlightMapProps> = ({ flights, airports }) => {
           const marker = L.marker([airport.latitude, airport.longitude + lngOffset], {
             icon: icon,
             pane: 'airportHighlights', // 在自定义 Pane 中渲染
-            interactive: false,
+            interactive: true,
           }).addTo(map);
+
+          marker.on('click', () => {
+             onAirportClick(airport);
+          });
+
           airportMarkersRef.current.push(marker);
         });
       }
@@ -203,17 +219,11 @@ const FlightMap: React.FC<FlightMapProps> = ({ flights, airports }) => {
           ],
         }).addTo(map);
         
-        const popupContent = `
-          <div>
-            <h3>Flight Details</h3>
-            <p><strong>Flight No:</strong> ${flight.flightNumber}</p>
-            <p><strong>From:</strong> ${departureAirport.name} (${departureAirport.code})</p>
-            <p><strong>To:</strong> ${arrivalAirport.name} (${arrivalAirport.code})</p>
-            <p><strong>Departure:</strong> ${new Date(flight.departureTime).toLocaleString()}</p>
-          </div>
-        `;
-
-        hitArea.bindPopup(popupContent);
+        // 替换 bindPopup 为 onClick
+        hitArea.on('click', (e) => {
+            L.DomEvent.stopPropagation(e); // 防止地图点击事件
+            onFlightClick(flight);
+        });
 
         hitArea.on('mouseover', () => {
           path.setStyle({ weight: 4, color: flight.color, opacity: 1 });
@@ -225,13 +235,14 @@ const FlightMap: React.FC<FlightMapProps> = ({ flights, airports }) => {
         pathsRef.current.set(`${flight.flightNumber}-${flight.departureTime}`, { path, decorator, hitArea });
       }
     });
-  }, [map, processedFlights, airportActivity, airports]); // 3. 添加 map 到依赖数组
+  }, [map, processedFlights, airportActivity, airports, onAirportClick, onFlightClick]); // 3. 添加 map 到依赖数组
 
   return (
     <div style={{ height: '100vh', width: '100%' }}>
       <MapContainer
         center={center}
         zoom={2}
+        zoomControl={false} // Disable default zoom control
         style={{ height: '100%', width: '100%', backgroundColor: isDarkMode ? '#2d3748' : '#ffffff' }}
         ref={setMap}
         maxBoundsViscosity={1.0}
@@ -248,6 +259,7 @@ const FlightMap: React.FC<FlightMapProps> = ({ flights, airports }) => {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
           // 移除 noWrap={true}，因为它导致了地图只显示一半的问题
         />
+        <ZoomControl position="bottomright" />
       </MapContainer>
     </div>
   );
