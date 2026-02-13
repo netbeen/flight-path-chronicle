@@ -64,8 +64,8 @@ interface FlightMapProps {
 }
 
 const FlightMap: React.FC<FlightMapProps> = ({ flights, airports, onAirportClick, onFlightClick, focusedLocation }) => {
-  // 将地图中心点调整为太平洋，以实现“亚洲在左，美洲在右”的布局
-  const center: [number, number] = [30, -150];
+  // 将地图中心点调整为中国，以满足用户需求
+  const center: [number, number] = [35, 105];
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [map, setMap] = useState<L.Map | null>(null);
   const pathsRef = useRef<Map<string, { path: L.Polyline; decorator: L.PolylineDecorator; hitArea: L.Polyline }>>(new Map());
@@ -83,11 +83,11 @@ const FlightMap: React.FC<FlightMapProps> = ({ flights, airports, onAirportClick
     return () => darkModeMediaQuery.removeEventListener('change', handleChange);
   }, []);
 
-  // 使用 useEffect 强制设置地图的初始视图，确保太平洋为中心
+  // 使用 useEffect 强制设置地图的初始视图，确保以中国为中心
   useEffect(() => {
     if (map) {
-      // 将视图中心设置为 [-150, 30]，并设置缩放级别
-      map.setView([30, -150], 2);
+      // 将视图中心设置为 [35, 105]，并设置缩放级别
+      map.setView([35, 105], 4);
     }
   }, [map]); // 此效果仅在 map 实例准备好后运行一次
 
@@ -243,14 +243,15 @@ const FlightMap: React.FC<FlightMapProps> = ({ flights, airports, onAirportClick
     <div style={{ height: '100vh', width: '100%' }}>
       <MapContainer
         center={center}
-        zoom={2}
+        zoom={4}
+        minZoom={2}
         zoomControl={false} // Disable default zoom control
         style={{ height: '100%', width: '100%', backgroundColor: isDarkMode ? '#2d3748' : '#ffffff' }}
         ref={setMap}
         maxBoundsViscosity={1.0}
-        // 使用 worldCopyJump 来创建一个连续的、可滚动的世界地图
-        // 这是实现太平洋中心视图的标准方式
-        worldCopyJump={true}
+        maxBounds={[[-90, -180], [90, 180]]}
+        // 由于设置了 maxBounds，worldCopyJump 将不再生效，这可以防止用户拖动到地图边缘以外的空白区域
+        // worldCopyJump={true} 
       >
         <TileLayer
           url={
