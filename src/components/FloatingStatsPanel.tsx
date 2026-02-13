@@ -59,7 +59,7 @@ const FloatingStatsPanel: React.FC<FloatingStatsPanelProps> = ({
 
         {/* Content */}
         {!isCollapsed && (
-          <div className="p-5 space-y-6">
+          <div className="p-5 space-y-6 max-h-[80vh] overflow-y-auto custom-scrollbar">
             {/* Filters */}
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -102,6 +102,36 @@ const FloatingStatsPanel: React.FC<FloatingStatsPanelProps> = ({
                 <p className="text-xl font-bold text-green-300">{stats.totalFlights}</p>
                 <p className="text-xs text-gray-500">次</p>
               </div>
+            </div>
+
+            {/* Additional Stats */}
+            <div className="grid grid-cols-1 gap-3">
+              {stats.topAirline && (
+                <div className="flex justify-between items-center text-sm border-b border-white/5 pb-2">
+                  <span className="text-gray-400">最爱航司</span>
+                  <span className="font-semibold text-purple-300">
+                    {stats.topAirline.name} <span className="text-xs text-gray-500">({stats.topAirline.count}次)</span>
+                  </span>
+                </div>
+              )}
+              {stats.longestFlight && (
+                 <div className="flex flex-col text-sm border-b border-white/5 pb-2">
+                    <span className="text-gray-400 mb-1">最长航线</span>
+                    <div className="flex justify-between">
+                        <span className="font-semibold">{stats.longestFlight.from} → {stats.longestFlight.to}</span>
+                        <span className="text-blue-300">{stats.longestFlight.distance.toLocaleString()} km</span>
+                    </div>
+                 </div>
+              )}
+              {stats.shortestFlight && (
+                 <div className="flex flex-col text-sm border-b border-white/5 pb-2">
+                    <span className="text-gray-400 mb-1">最短航线</span>
+                    <div className="flex justify-between">
+                        <span className="font-semibold">{stats.shortestFlight.from} → {stats.shortestFlight.to}</span>
+                        <span className="text-green-300">{stats.shortestFlight.distance.toLocaleString()} km</span>
+                    </div>
+                 </div>
+              )}
             </div>
 
             {/* Top Destinations */}

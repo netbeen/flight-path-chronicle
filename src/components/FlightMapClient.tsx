@@ -1,11 +1,12 @@
 "use client";
 
 import dynamic from 'next/dynamic';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Flight } from '@/data/flight';
 import { Airport } from '@/data/airport';
 import Sidebar from '@/components/Sidebar';
 import FloatingStatsPanel from '@/components/FloatingStatsPanel';
+import TimelineController from '@/components/TimelineController';
 import { getAvailableYears, getAvailableAirlines, ProcessedFlight } from '@/data/flightProcessor';
 
 // 使用 next/dynamic 动态导入 FlightMap 组件，并禁用 SSR
@@ -34,14 +35,27 @@ export default function FlightMapClient({ flights, airports }: FlightMapClientPr
   const [selectedItem, setSelectedItem] = useState<Airport | Flight | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
   const [focusedLocation, setFocusedLocation] = useState<{ lat: number; lng: number; zoom?: number } | null>(null);
+  
+  // Timeline states
+  const [currentDate, setCurrentDate] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // 获取所有可选年份和航司
   const years = useMemo(() => getAvailableYears(flights), [flights]);
   const airlines = useMemo(() => getAvailableAirlines(flights), [flights]);
 
+  // Sort flights by date
+  const sortedFlights = useMemo(() => {
+    return [...flights].sort((a, b) => new Date(a.departureTime).getTime() - new Date(b.departureTime).getTime());
+  }, [flights]);
+
+  const startDate = sortedFlights[0]?.departureTime;
+  const endDate = sortedFlights[sortedFlights.length - 1]?.departureTime;
+
   // 根据条件筛选航班
   const filteredFlights = useMemo(() => {
-    return flights.filter(flight => {
+    let result = flights.filter(flight => {
       const year = new Date(flight.departureTime).getFullYear().toString();
       const airlineCode = flight.flightNumber.substring(0, 2);
       
@@ -50,7 +64,51 @@ export default function FlightMapClient({ flights, airports }: FlightMapClientPr
       
       return yearMatch && airlineMatch;
     });
-  }, [flights, selectedYear, selectedAirline]);
+
+    // Apply timeline filter if currentDate is set
+    if (currentDate) {
+        const currentTime = new Date(currentDate).getTime();
+        result = result.filter(flight => new Date(flight.departureTime).getTime() <= currentTime);
+    }
+
+    return result;
+  }, [flights, selectedYear, selectedAirline, currentDate]);
+
+  // Timeline playback logic
+  useEffect(() => {
+    if (isPlaying) {
+      timerRef.current = setInterval(() => {
+        setCurrentDate(prev => {
+          if (!prev) return startDate; // If null, start from beginning
+          const current = new Date(prev).getTime();
+          const end = new Date(endDate).getTime();
+          const start = new Date(startDate).getTime();
+          const duration = end - start;
+          const step = duration / 200; // Divide total duration into 200 steps
+          
+          let nextTime = current + step;
+          if (nextTime >= end) {
+            setIsPlaying(false);
+            return endDate;
+          }
+          return new Date(nextTime).toISOString();
+        });
+      }, 50); // Update every 50ms
+    } else if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [isPlaying, startDate, endDate]);
+
+  const handlePlayPause = () => {
+      if (!currentDate) {
+          setCurrentDate(startDate);
+      }
+      setIsPlaying(!isPlaying);
+  };
+
 
   // 获取选中项目的相关航班（仅针对机场）
   const relatedFlights = useMemo(() => {
@@ -101,6 +159,18 @@ export default function FlightMapClient({ flights, airports }: FlightMapClientPr
             onAirlineChange={setSelectedAirline}
             onDestinationHover={handleDestinationHover}
         />
+
+        {/* Timeline Controller */}
+        {sortedFlights.length > 0 && (
+            <TimelineController 
+                startDate={startDate}
+                endDate={endDate}
+                currentDate={currentDate}
+                onDateChange={setCurrentDate}
+                isPlaying={isPlaying}
+                onPlayPause={handlePlayPause}
+            />
+        )}
 
         {/* Sidebar */}
         <Sidebar 

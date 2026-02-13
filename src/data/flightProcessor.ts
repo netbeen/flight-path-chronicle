@@ -154,6 +154,22 @@ export interface FlightStatistics {
     name: string;
     count: number;
   }[];
+  // 新增统计维度
+  longestFlight?: {
+    from: string;
+    to: string;
+    distance: number;
+  };
+  shortestFlight?: {
+    from: string;
+    to: string;
+    distance: number;
+  };
+  topAirline?: {
+    code: string;
+    name: string;
+    count: number;
+  };
 }
 
 /**
@@ -166,22 +182,52 @@ export const calculateFlightStatistics = (flights: Flight[], airports: Airport[]
   const totalFlights = flights.length;
   let totalDistance = 0;
   const destinationCounts = new Map<string, number>();
+  const airlineCounts = new Map<string, number>();
   const airportIndex = buildAirportIndex(airports);
+
+  let maxDistance = -1;
+  let minDistance = Infinity;
+  let longestFlight = undefined;
+  let shortestFlight = undefined;
 
   flights.forEach(flight => {
     const departureAirport = airportIndex.get(flight.departureAirport);
     const arrivalAirport = airportIndex.get(flight.arrivalAirport);
+    let distance = 0;
 
     if (departureAirport && arrivalAirport) {
-      totalDistance += getDistance(
+      distance = getDistance(
         departureAirport.latitude,
         departureAirport.longitude,
         arrivalAirport.latitude,
         arrivalAirport.longitude
       );
+      totalDistance += distance;
+
+      // 更新最长/最短航线
+      if (distance > maxDistance) {
+        maxDistance = distance;
+        longestFlight = {
+            from: flight.departureAirport,
+            to: flight.arrivalAirport,
+            distance: Math.round(distance)
+        };
+      }
+      if (distance < minDistance) {
+        minDistance = distance;
+        shortestFlight = {
+            from: flight.departureAirport,
+            to: flight.arrivalAirport,
+            distance: Math.round(distance)
+        };
+      }
     }
 
     destinationCounts.set(flight.arrivalAirport, (destinationCounts.get(flight.arrivalAirport) || 0) + 1);
+
+    // 统计航司
+    const airlineCode = flight.flightNumber.substring(0, 2);
+    airlineCounts.set(airlineCode, (airlineCounts.get(airlineCode) || 0) + 1);
   });
 
   const topDestinations = Array.from(destinationCounts.entries())
@@ -196,10 +242,25 @@ export const calculateFlightStatistics = (flights: Flight[], airports: Airport[]
       };
     });
 
+  // 计算最爱航司
+  let topAirline = undefined;
+  if (airlineCounts.size > 0) {
+      const sortedAirlines = Array.from(airlineCounts.entries()).sort((a, b) => b[1] - a[1]);
+      const [code, count] = sortedAirlines[0];
+      topAirline = {
+          code,
+          name: AIRLINE_NAMES[code] || code,
+          count
+      };
+  }
+
   return {
     totalFlights,
     totalDistance: Math.round(totalDistance), // 四舍五入到整数
     topDestinations,
+    longestFlight,
+    shortestFlight,
+    topAirline,
   };
 };
 

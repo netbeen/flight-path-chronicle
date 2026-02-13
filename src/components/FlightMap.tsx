@@ -190,6 +190,8 @@ const FlightMap: React.FC<FlightMapProps> = ({ flights, airports, onAirportClick
           weight: 2,
           opacity: 0.7,
           interactive: false,
+          dashArray: '10, 10', // 设置虚线
+          className: 'flight-path-animated', // 应用 CSS 动画类名
         }).addTo(map);
 
         const hitArea = L.polyline(polylinePoints, {

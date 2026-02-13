@@ -30,6 +30,18 @@ code {
   box-shadow: 0 0 8px 3px rgba(255, 223, 0, 0.4);
 }
 
+/* 航线流光动画关键帧 */
+@keyframes dash-flow {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+/* 应用动画到路径 */
+.flight-path-animated {
+  animation: dash-flow 1s linear infinite;
+}
+
 /* 自定义滚动条样式 */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
