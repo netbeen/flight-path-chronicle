@@ -269,4 +269,10 @@ export const FLIGHTS: Flight[] = [
     departureAirport: 'SIN',
     arrivalAirport: 'HGH',
   },
+  {
+    flightNumber: 'CA1723',
+    departureTime: '2026-02-08T18:30:00',
+    departureAirport: 'HGH',
+    arrivalAirport: 'PEK',
+  },
 ];

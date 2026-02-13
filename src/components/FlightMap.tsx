@@ -249,7 +249,7 @@ const FlightMap: React.FC<FlightMapProps> = ({ flights, airports, onAirportClick
         style={{ height: '100%', width: '100%', backgroundColor: isDarkMode ? '#2d3748' : '#ffffff' }}
         ref={setMap}
         maxBoundsViscosity={1.0}
-        maxBounds={[[-90, -180], [90, 180]]}
+        maxBounds={[[-90, -20], [90, 380]]}
         // 由于设置了 maxBounds，worldCopyJump 将不再生效，这可以防止用户拖动到地图边缘以外的空白区域
         // worldCopyJump={true} 
       >
