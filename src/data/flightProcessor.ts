@@ -11,6 +11,7 @@ export interface ProcessedFlight extends Flight {
     latitude: number;
     longitude: number;
   };
+  distance?: number; // 航程距离 (km)
 }
 
 /**
@@ -88,6 +89,14 @@ export const processFlights = (flights: Flight[], airports: Airport[]): Processe
       const departureAirport = { ...departureAirportRaw, longitude: departureAirportRaw.longitude < 0 ? departureAirportRaw.longitude + 360 : departureAirportRaw.longitude };
       const arrivalAirport = { ...arrivalAirportRaw, longitude: arrivalAirportRaw.longitude < 0 ? arrivalAirportRaw.longitude + 360 : arrivalAirportRaw.longitude };
 
+      // 计算距离
+      const distance = getDistance(
+        departureAirportRaw.latitude,
+        departureAirportRaw.longitude,
+        arrivalAirportRaw.latitude,
+        arrivalAirportRaw.longitude
+      );
+
       const direction = getDirection(departureAirport, arrivalAirport);
       const color = direction === 'outgoing' ? '#f87171' : '#60a5fa'; // 去程红色，返程蓝色
 
@@ -117,6 +126,7 @@ export const processFlights = (flights: Flight[], airports: Airport[]): Processe
           color,
           curvature,
           arrivalAirportModified,
+          distance: Math.round(distance), // 添加距离，四舍五入到整数
         });
       });
     }

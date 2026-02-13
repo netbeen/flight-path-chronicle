@@ -1,5 +1,6 @@
 import React from 'react';
 import { Airport, Flight } from '@/data';
+import { ProcessedFlight } from '@/data/flightProcessor';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -17,27 +18,37 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, selectedItem, relate
 
   const renderContent = () => {
     if (isFlight(selectedItem)) {
-      const departureDate = new Date(selectedItem.departureTime);
+      const flight = selectedItem as ProcessedFlight; // Cast to ProcessedFlight to access distance
+      const departureDate = new Date(flight.departureTime);
       return (
         <div className="space-y-6">
           <div className="border-b border-gray-700 pb-4">
-            <h2 className="text-2xl font-bold text-white mb-2">{selectedItem.flightNumber}</h2>
+            <h2 className="text-2xl font-bold text-white mb-2">{flight.flightNumber}</h2>
             <p className="text-gray-400 text-sm">航班详情</p>
           </div>
           
           <div className="grid grid-cols-2 gap-4 text-white">
             <div>
               <p className="text-gray-400 text-xs uppercase mb-1">出发地</p>
-              <p className="text-xl font-semibold">{selectedItem.departureAirport}</p>
+              <p className="text-xl font-semibold">{flight.departureAirport}</p>
             </div>
             <div>
               <p className="text-gray-400 text-xs uppercase mb-1">目的地</p>
-              <p className="text-xl font-semibold">{selectedItem.arrivalAirport}</p>
+              <p className="text-xl font-semibold">{flight.arrivalAirport}</p>
             </div>
             <div className="col-span-2">
               <p className="text-gray-400 text-xs uppercase mb-1">起飞时间</p>
               <p className="text-lg">{departureDate.toLocaleString()}</p>
             </div>
+            {flight.distance && (
+              <div className="col-span-2 mt-2 pt-2 border-t border-gray-800">
+                <p className="text-gray-400 text-xs uppercase mb-1">航程距离</p>
+                <div className="flex items-baseline">
+                  <p className="text-2xl font-mono text-blue-400">{flight.distance.toLocaleString()}</p>
+                  <span className="ml-1 text-sm text-gray-500">km</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       );
