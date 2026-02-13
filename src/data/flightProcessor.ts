@@ -158,11 +158,15 @@ export interface FlightStatistics {
   longestFlight?: {
     from: string;
     to: string;
+    fromName: string;
+    toName: string;
     distance: number;
   };
   shortestFlight?: {
     from: string;
     to: string;
+    fromName: string;
+    toName: string;
     distance: number;
   };
   topAirline?: {
@@ -210,6 +214,8 @@ export const calculateFlightStatistics = (flights: Flight[], airports: Airport[]
         longestFlight = {
             from: flight.departureAirport,
             to: flight.arrivalAirport,
+            fromName: departureAirport.name,
+            toName: arrivalAirport.name,
             distance: Math.round(distance)
         };
       }
@@ -218,6 +224,8 @@ export const calculateFlightStatistics = (flights: Flight[], airports: Airport[]
         shortestFlight = {
             from: flight.departureAirport,
             to: flight.arrivalAirport,
+            fromName: departureAirport.name,
+            toName: arrivalAirport.name,
             distance: Math.round(distance)
         };
       }

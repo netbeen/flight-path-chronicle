@@ -117,18 +117,18 @@ const FloatingStatsPanel: React.FC<FloatingStatsPanelProps> = ({
               {stats.longestFlight && (
                  <div className="flex flex-col text-sm border-b border-white/5 pb-2">
                     <span className="text-gray-400 mb-1">最长航线</span>
-                    <div className="flex justify-between">
-                        <span className="font-semibold">{stats.longestFlight.from} → {stats.longestFlight.to}</span>
-                        <span className="text-blue-300">{stats.longestFlight.distance.toLocaleString()} km</span>
+                    <div className="flex justify-between flex-wrap gap-1">
+                        <span className="font-semibold">{stats.longestFlight.fromName} → {stats.longestFlight.toName}</span>
+                        <span className="text-blue-300 whitespace-nowrap">{stats.longestFlight.distance.toLocaleString()} km</span>
                     </div>
                  </div>
               )}
               {stats.shortestFlight && (
                  <div className="flex flex-col text-sm border-b border-white/5 pb-2">
                     <span className="text-gray-400 mb-1">最短航线</span>
-                    <div className="flex justify-between">
-                        <span className="font-semibold">{stats.shortestFlight.from} → {stats.shortestFlight.to}</span>
-                        <span className="text-green-300">{stats.shortestFlight.distance.toLocaleString()} km</span>
+                    <div className="flex justify-between flex-wrap gap-1">
+                        <span className="font-semibold">{stats.shortestFlight.fromName} → {stats.shortestFlight.toName}</span>
+                        <span className="text-green-300 whitespace-nowrap">{stats.shortestFlight.distance.toLocaleString()} km</span>
                     </div>
                  </div>
               )}
