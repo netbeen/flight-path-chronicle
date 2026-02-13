@@ -256,10 +256,10 @@ const FlightMap: React.FC<FlightMapProps> = ({ flights, airports, onAirportClick
         <TileLayer
           url={
             isDarkMode
-              ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-              : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+              ? 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}'
+              : 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}'
           }
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+          attribution='Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ'
           // 移除 noWrap={true}，因为它导致了地图只显示一半的问题
         />
         <ZoomControl position="bottomright" />
