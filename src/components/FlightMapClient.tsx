@@ -13,7 +13,12 @@ import { getAvailableYears, getAvailableAirlines, ProcessedFlight } from '@/data
 const FlightMap = dynamic(() => import('@/components/FlightMap'), { 
   ssr: false,
   // 添加一个加载状态，提升用户体验
-  loading: () => <p style={{ textAlign: 'center', paddingTop: '20px' }}>Loading Map...</p>,
+  loading: () => (
+    <div className="w-full h-full flex flex-col items-center justify-center bg-gray-900 text-white">
+      <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+      <p className="text-lg font-light tracking-widest">LOADING MAP DATA...</p>
+    </div>
+  ),
 });
 
 interface FlightMapClientProps {
