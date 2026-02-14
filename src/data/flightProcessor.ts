@@ -80,7 +80,7 @@ export const processFlights = (flights: Flight[], airports: Airport[]): Processe
   const baseCurvature = 0.15; // 基础曲率
 
   // 2. 遍历每个航线组，计算其属性
-  flightGroups.forEach((group, key) => {
+  flightGroups.forEach((group) => {
     const departureAirportRaw = airportIndex.get(group[0].departureAirport);
     const arrivalAirportRaw = airportIndex.get(group[0].arrivalAirport);
 

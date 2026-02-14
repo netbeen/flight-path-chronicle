@@ -7,6 +7,10 @@ export interface Airport {
   latitude: number;
   /** 机场物理坐标 */
   longitude: number;
+  /** 所在城市 (Optional for now as existing data doesn't have it) */
+  city?: string;
+  /** 所在国家 (Optional) */
+  country?: string;
 }
 
 /** 预定义的机场数据 */

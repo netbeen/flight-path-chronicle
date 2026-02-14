@@ -21,6 +21,16 @@
         "name": "next"
       }
     ],
+    "types": [
+      "node",
+      "jest",
+      "react",
+      "react-dom",
+      "babel__core",
+      "babel__generator",
+      "babel__template",
+      "babel__traverse"
+    ],
     "paths": {
       "@/*": [
         "./src/*"

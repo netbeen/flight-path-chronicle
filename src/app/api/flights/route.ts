@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { FLIGHTS } from '@/data/flight';
 import { AIRPORTS } from '@/data/airport';
 
+/* eslint-disable no-console */
 export async function GET() {
   // 1. 创建一个机场代码的 Set，用于快速查找
   const airportCodes = new Set(AIRPORTS.map(airport => airport.code));

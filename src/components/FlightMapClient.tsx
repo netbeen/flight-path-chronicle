@@ -91,7 +91,7 @@ export default function FlightMapClient({ flights, airports }: FlightMapClientPr
           const duration = end - start;
           const step = duration / 200; // Divide total duration into 200 steps
           
-          let nextTime = current + step;
+          const nextTime = current + step;
           if (nextTime >= end) {
             setIsPlaying(false);
             return endDate;

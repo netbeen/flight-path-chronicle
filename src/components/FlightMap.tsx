@@ -7,6 +7,7 @@ import L from 'leaflet';
 import 'leaflet-polylinedecorator';
 import { Airport, Flight } from '@/data';
 import { processFlights, calculateAirportActivity, ProcessedFlight } from '@/data/flightProcessor';
+import { MAP_CONFIG } from '@/config/mapConfig';
 
 // --- Helper functions for Bezier curve calculation ---
 
@@ -65,7 +66,7 @@ interface FlightMapProps {
 
 const FlightMap: React.FC<FlightMapProps> = ({ flights, airports, onAirportClick, onFlightClick, focusedLocation }) => {
   // 将地图中心点调整为中国，以满足用户需求
-  const center: [number, number] = [35, 105];
+  const center: L.LatLngExpression = MAP_CONFIG.defaultCenter;
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [map, setMap] = useState<L.Map | null>(null);
   const pathsRef = useRef<Map<string, { path: L.Polyline; decorator: L.PolylineDecorator; hitArea: L.Polyline }>>(new Map());
@@ -86,8 +87,8 @@ const FlightMap: React.FC<FlightMapProps> = ({ flights, airports, onAirportClick
   // 使用 useEffect 强制设置地图的初始视图，确保以中国为中心
   useEffect(() => {
     if (map) {
-      // 将视图中心设置为 [35, 105]，并设置缩放级别
-      map.setView([35, 105], 4);
+      // 将视图中心设置为默认中心，并设置缩放级别
+      map.setView(MAP_CONFIG.defaultCenter, MAP_CONFIG.defaultZoom);
     }
   }, [map]); // 此效果仅在 map 实例准备好后运行一次
 
@@ -181,9 +182,19 @@ const FlightMap: React.FC<FlightMapProps> = ({ flights, airports, onAirportClick
           ? L.latLng(flight.arrivalAirportModified.latitude, flight.arrivalAirportModified.longitude)
           : L.latLng(arrivalAirport.latitude, arrivalLongitude);
         
+        // Adaptive sampling based on distance
+        // Short flights (<1000km) don't need many points, while long transcontinental flights do.
+        const distance = p0.distanceTo(p2); // in meters
+        let numPoints = 20;
+        if (distance > 5000000) { // > 5000km
+          numPoints = 60;
+        } else if (distance > 1000000) { // > 1000km
+          numPoints = 40;
+        }
+
         // 直接使用处理后的曲率，并传入 map 实例以进行投影计算
         const controlPoint = getControlPoint(p0, p2, flight.curvature, map);
-        const polylinePoints = getQuadraticBezierPoints(p0, controlPoint, p2);
+        const polylinePoints = getQuadraticBezierPoints(p0, controlPoint, p2, numPoints);
 
         const path = L.polyline(polylinePoints, {
           color: flight.color, // 使用处理后的颜色
@@ -243,23 +254,23 @@ const FlightMap: React.FC<FlightMapProps> = ({ flights, airports, onAirportClick
     <div style={{ height: '100vh', width: '100%' }}>
       <MapContainer
         center={center}
-        zoom={4}
-        minZoom={2}
+        zoom={MAP_CONFIG.defaultZoom}
+        minZoom={MAP_CONFIG.minZoom}
         zoomControl={false} // Disable default zoom control
         style={{ height: '100%', width: '100%', backgroundColor: isDarkMode ? '#2d3748' : '#ffffff' }}
         ref={setMap}
-        maxBoundsViscosity={1.0}
-        maxBounds={[[-90, -20], [90, 380]]}
+        maxBoundsViscosity={MAP_CONFIG.maxBoundsViscosity}
+        maxBounds={MAP_CONFIG.maxBounds}
         // 由于设置了 maxBounds，worldCopyJump 将不再生效，这可以防止用户拖动到地图边缘以外的空白区域
         // worldCopyJump={true} 
       >
         <TileLayer
           url={
             isDarkMode
-              ? 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}'
-              : 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}'
+              ? MAP_CONFIG.tileProviders.dark
+              : MAP_CONFIG.tileProviders.light
           }
-          attribution='Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ'
+          attribution={MAP_CONFIG.attribution}
           // 移除 noWrap={true}，因为它导致了地图只显示一半的问题
         />
         <ZoomControl position="bottomright" />
