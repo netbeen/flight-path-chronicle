@@ -89,6 +89,28 @@ test('高频新加坡往返航线保持逐条可见且几何不重叠', async ({
   expect(new Set(returningPaths).size).toBe(8);
 });
 
+test('航线宽度随地图缩放保持相对一致', async ({ page }) => {
+  const route = page.locator('path.route-HGH-SIN').first();
+  const zoomOut = page.locator('.leaflet-control-zoom-out');
+  const zoomIn = page.locator('.leaflet-control-zoom-in');
+
+  await expect(route).toBeVisible();
+  const baselineWeight = Number(await route.getAttribute('stroke-width'));
+
+  await zoomOut.click();
+  await zoomOut.click();
+  await expect.poll(async () => Number(await route.getAttribute('stroke-width'))).toBeLessThan(baselineWeight);
+  const zoomedOutWeight = Number(await route.getAttribute('stroke-width'));
+
+  await zoomIn.click();
+  await zoomIn.click();
+  await expect.poll(async () => Number(await route.getAttribute('stroke-width'))).toBeCloseTo(baselineWeight, 3);
+  const restoredWeight = Number(await route.getAttribute('stroke-width'));
+
+  expect(zoomedOutWeight).toBeLessThan(baselineWeight);
+  expect(restoredWeight).toBeCloseTo(baselineWeight, 3);
+});
+
 test('主要浮层在当前视口内且互不覆盖', async ({ page }) => {
   const panel = page.locator('.flight-panel');
   const timeline = page.locator('.timeline-shell');

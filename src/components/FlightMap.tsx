@@ -9,6 +9,7 @@ import { Airport, Flight } from '@/data';
 import { processFlights, calculateAirportActivity, ProcessedFlight } from '@/data/flightProcessor';
 import { MAP_CONFIG } from '@/config/mapConfig';
 import { getFlightId, MapCommand } from '@/components/flightUiTypes';
+import { getRouteVisualMetrics } from '@/components/mapVisualScale';
 
 // --- Helper functions for Bezier curve calculation ---
 
@@ -87,10 +88,12 @@ const FlightMap: React.FC<FlightMapProps> = ({
     decorator: L.PolylineDecorator;
     hitArea: L.Polyline;
     color: string;
+    arrowOffset: string;
   }>>(new Map());
   const airportMarkersRef = useRef<L.Marker[]>([]);
   const isAnimatingRef = useRef(false);
   const selectedFlightIdRef = useRef(selectedFlightId);
+  const hoveredFlightIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     selectedFlightIdRef.current = selectedFlightId;
@@ -253,13 +256,17 @@ const FlightMap: React.FC<FlightMapProps> = ({
         // 直接使用处理后的曲率，并传入 map 实例以进行投影计算
         const controlPoint = getControlPoint(p0, p2, flight.curvature, map);
         const polylinePoints = getQuadraticBezierPoints(p0, controlPoint, p2, numPoints);
+        const visualMetrics = getRouteVisualMetrics(map.getZoom());
+        const arrowOffset = `${flight.routeCount === 1
+          ? 50
+          : 38 + (flight.routeIndex / (flight.routeCount - 1)) * 24}%`;
 
         const path = L.polyline(polylinePoints, {
           color: flight.color, // 使用处理后的颜色
-          weight: 2,
+          weight: visualMetrics.weight,
           opacity: careerMode ? 0.78 : 0.62,
           interactive: false,
-          dashArray: careerMode ? '7, 7' : '10, 10',
+          dashArray: `${visualMetrics.dashSize}, ${visualMetrics.dashSize}`,
           className: `${careerMode ? 'flight-path-poster' : 'flight-path-animated'} route-${flight.departureAirport}-${flight.arrivalAirport}`,
         }).addTo(map);
 
@@ -273,13 +280,11 @@ const FlightMap: React.FC<FlightMapProps> = ({
         const decorator = L.polylineDecorator(path, {
           patterns: [
             {
-              offset: `${flight.routeCount === 1
-                ? 50
-                : 38 + (flight.routeIndex / (flight.routeCount - 1)) * 24}%`,
+              offset: arrowOffset,
               repeat: 0,
               // 1. 修改箭头符号的定义
               symbol: L.Symbol.arrowHead({
-                pixelSize: 10,
+                pixelSize: visualMetrics.arrowSize,
                 polygon: true,
                 pathOptions: {
                   stroke: false,
@@ -301,13 +306,17 @@ const FlightMap: React.FC<FlightMapProps> = ({
         const flightId = getFlightId(flight);
 
         hitArea.on('mouseover', () => {
-          path.setStyle({ weight: 4, color: flight.color, opacity: 1 });
+          hoveredFlightIdRef.current = flightId;
+          const metrics = getRouteVisualMetrics(map.getZoom());
+          path.setStyle({ weight: metrics.hoverWeight, color: flight.color, opacity: 1 });
         });
         hitArea.on('mouseout', () => {
+          hoveredFlightIdRef.current = null;
           const currentSelection = selectedFlightIdRef.current;
           const isSelected = currentSelection === flightId;
+          const metrics = getRouteVisualMetrics(map.getZoom());
           path.setStyle({
-            weight: isSelected ? 5 : 2,
+            weight: isSelected ? metrics.selectedWeight : metrics.weight,
             color: flight.color,
             opacity: isSelected ? 1 : currentSelection ? 0.22 : 0.62,
           });
@@ -318,6 +327,7 @@ const FlightMap: React.FC<FlightMapProps> = ({
           decorator,
           hitArea,
           color: flight.color,
+          arrowOffset,
         });
       }
     });
@@ -327,14 +337,67 @@ const FlightMap: React.FC<FlightMapProps> = ({
     pathsRef.current.forEach(({ path, color }, id) => {
       const isSelected = selectedFlightId === id;
       const hasSelection = selectedFlightId !== null;
+      const isHovered = hoveredFlightIdRef.current === id;
+      const metrics = getRouteVisualMetrics(map?.getZoom() ?? MAP_CONFIG.defaultZoom);
       path.setStyle({
         color,
-        weight: isSelected ? 5 : 2,
-        opacity: isSelected ? 1 : hasSelection ? 0.22 : 0.62,
+        weight: isHovered
+          ? metrics.hoverWeight
+          : isSelected
+            ? metrics.selectedWeight
+            : metrics.weight,
+        opacity: isHovered || isSelected ? 1 : hasSelection ? 0.22 : 0.62,
       });
       if (isSelected) path.bringToFront();
     });
-  }, [selectedFlightId, processedFlights]);
+  }, [map, selectedFlightId, processedFlights]);
+
+  useEffect(() => {
+    if (!map) return;
+
+    const updateRouteScale = () => {
+      const metrics = getRouteVisualMetrics(map.getZoom());
+      const selection = selectedFlightIdRef.current;
+      const hovered = hoveredFlightIdRef.current;
+
+      pathsRef.current.forEach(({ path, decorator, color, arrowOffset }, id) => {
+        const isSelected = selection === id;
+        const isHovered = hovered === id;
+        path.setStyle({
+          color,
+          weight: isHovered
+            ? metrics.hoverWeight
+            : isSelected
+              ? metrics.selectedWeight
+              : metrics.weight,
+          opacity: isHovered || isSelected ? 1 : selection ? 0.22 : careerMode ? 0.78 : 0.62,
+          dashArray: `${metrics.dashSize}, ${metrics.dashSize}`,
+        });
+        decorator.setPatterns([
+          {
+            offset: arrowOffset,
+            repeat: 0,
+            symbol: L.Symbol.arrowHead({
+              pixelSize: metrics.arrowSize,
+              polygon: true,
+              pathOptions: {
+                stroke: false,
+                fill: true,
+                fillColor: color,
+                fillOpacity: 1,
+              },
+            }),
+          },
+        ]);
+      });
+    };
+
+    updateRouteScale();
+    map.on('zoomend', updateRouteScale);
+    return () => {
+      map.off('zoomend', updateRouteScale);
+    };
+  }, [map, processedFlights, careerMode]);
 
   useEffect(() => {
     if (!map) return;
