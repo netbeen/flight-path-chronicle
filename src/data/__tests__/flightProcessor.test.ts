@@ -62,7 +62,7 @@ describe('flightProcessor', () => {
         expect(flight.distance).toBeLessThan(1300);
     });
 
-    it('should cap curvature for frequently repeated routes', () => {
+    it('should preserve a unique curvature for every repeated route', () => {
         const repeatedFlights = Array.from({ length: 8 }, (_, index) => ({
             ...mockFlights[0],
             flightNumber: `CA${1200 + index}`,
@@ -71,7 +71,11 @@ describe('flightProcessor', () => {
 
         const processed = processFlights(repeatedFlights, mockAirports);
         expect(processed).toHaveLength(8);
-        expect(Math.max(...processed.map(flight => flight.curvature))).toBe(0.6);
+        expect(new Set(processed.map(flight => flight.curvature)).size).toBe(8);
+        expect(processed[0].curvature).toBeCloseTo(0.12);
+        expect(processed[7].curvature).toBeCloseTo(0.68);
+        expect(processed.map(flight => flight.routeIndex)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+        expect(processed.every(flight => flight.routeCount === 8)).toBe(true);
     });
 
     it('should handle date line crossing correctly', () => {

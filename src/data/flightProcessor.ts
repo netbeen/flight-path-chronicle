@@ -6,6 +6,8 @@ export interface ProcessedFlight extends Flight {
   direction: 'outgoing' | 'returning';
   color: string;
   curvature: number;
+  routeIndex: number;
+  routeCount: number;
   // 为跨日界线航线增加一个可选的、经度调整后的目标机场坐标
   arrivalAirportModified?: {
     latitude: number;
@@ -77,8 +79,8 @@ export const processFlights = (flights: Flight[], airports: Airport[]): Processe
   });
 
   const processedFlights: ProcessedFlight[] = [];
-  const baseCurvature = 0.15; // 基础曲率
-  const maxCurvature = 0.6;
+  const minCurvature = 0.12;
+  const maxCurvature = 0.68;
 
   // 2. 遍历每个航线组，计算其属性
   flightGroups.forEach((group) => {
@@ -103,7 +105,10 @@ export const processFlights = (flights: Flight[], airports: Airport[]): Processe
 
       // 为组内的每个航班分配递增的曲率，并处理跨日界线的情况
       group.forEach((flight, index) => {
-        const curvature = Math.min((index + 1) * baseCurvature, maxCurvature);
+        // 在固定视觉范围内均匀排布，确保高频航线仍然每条拥有唯一轨迹。
+        const curvature = group.length === 1
+          ? minCurvature
+          : minCurvature + (index / (group.length - 1)) * (maxCurvature - minCurvature);
 
         let arrivalAirportModified;
         // 在新的 [0, 360] 坐标系下，日界线变成了 180 度经线
@@ -126,6 +131,8 @@ export const processFlights = (flights: Flight[], airports: Airport[]): Processe
           direction,
           color,
           curvature,
+          routeIndex: index,
+          routeCount: group.length,
           arrivalAirportModified,
           distance: Math.round(distance), // 添加距离，四舍五入到整数
         });

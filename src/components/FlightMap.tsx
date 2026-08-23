@@ -260,7 +260,7 @@ const FlightMap: React.FC<FlightMapProps> = ({
           opacity: careerMode ? 0.78 : 0.62,
           interactive: false,
           dashArray: careerMode ? '7, 7' : '10, 10',
-          className: careerMode ? 'flight-path-poster' : 'flight-path-animated',
+          className: `${careerMode ? 'flight-path-poster' : 'flight-path-animated'} route-${flight.departureAirport}-${flight.arrivalAirport}`,
         }).addTo(map);
 
         const hitArea = L.polyline(polylinePoints, {
@@ -273,7 +273,9 @@ const FlightMap: React.FC<FlightMapProps> = ({
         const decorator = L.polylineDecorator(path, {
           patterns: [
             {
-              offset: '50%',
+              offset: `${flight.routeCount === 1
+                ? 50
+                : 38 + (flight.routeIndex / (flight.routeCount - 1)) * 24}%`,
               repeat: 0,
               // 1. 修改箭头符号的定义
               symbol: L.Symbol.arrowHead({

@@ -75,6 +75,20 @@ test('时间轴按真实航班前后导航', async ({ page }) => {
   await expect(page.getByText('全部行程')).toBeVisible();
 });
 
+test('高频新加坡往返航线保持逐条可见且几何不重叠', async ({ page }) => {
+  const outgoing = page.locator('path.route-HGH-SIN');
+  const returning = page.locator('path.route-SIN-HGH');
+
+  await expect(outgoing).toHaveCount(7);
+  await expect(returning).toHaveCount(8);
+
+  const outgoingPaths = await outgoing.evaluateAll((paths) => paths.map((path) => path.getAttribute('d')));
+  const returningPaths = await returning.evaluateAll((paths) => paths.map((path) => path.getAttribute('d')));
+
+  expect(new Set(outgoingPaths).size).toBe(7);
+  expect(new Set(returningPaths).size).toBe(8);
+});
+
 test('主要浮层在当前视口内且互不覆盖', async ({ page }) => {
   const panel = page.locator('.flight-panel');
   const timeline = page.locator('.timeline-shell');
