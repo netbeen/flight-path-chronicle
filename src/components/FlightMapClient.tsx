@@ -335,13 +335,19 @@ export default function FlightMapClient({ flights, airports }: FlightMapClientPr
         </>
       )}
 
-        {isCareerMode && careerYears.length > 0 && (
+        {isCareerMode
+          && careerYears.length > 0
+          && careerStats.longestFlight
+          && careerStats.mostFrequentRoute
+          && (
           <CareerPoster
             totalFlights={careerStats.totalFlights}
             totalDistance={careerStats.totalDistance}
             cityCount={cities.length}
             startYear={Math.min(...careerYears)}
             endYear={Math.max(...careerYears)}
+            longestFlight={careerStats.longestFlight}
+            mostFrequentRoute={careerStats.mostFrequentRoute}
             isExporting={isExporting}
             onDownload={downloadCareerPoster}
             onClose={closeCareerMode}

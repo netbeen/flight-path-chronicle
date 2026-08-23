@@ -125,6 +125,30 @@ describe('flightProcessor', () => {
           // Verify longest flight (NRT-LAX is definitely longer than PEK-PVG)
           expect(stats.longestFlight?.from).toBe('NRT');
           expect(['PEK', 'PVG']).toContain(stats.shortestFlight?.from);
+          expect(stats.mostFrequentRoute).toEqual(
+              expect.objectContaining({
+                  from: 'PEK',
+                  to: 'PVG',
+                  count: 1,
+              }),
+          );
+      });
+
+      it('should count frequent routes by direction', () => {
+          const flights: Flight[] = [
+              mockFlights[0],
+              mockFlights[1],
+              { ...mockFlights[0], flightNumber: 'CA2234' },
+          ];
+
+          const stats = calculateFlightStatistics(flights, mockAirports);
+          expect(stats.mostFrequentRoute).toEqual({
+              from: 'PEK',
+              to: 'PVG',
+              fromName: 'Beijing Capital',
+              toName: 'Shanghai Pudong',
+              count: 2,
+          });
       });
   });
   

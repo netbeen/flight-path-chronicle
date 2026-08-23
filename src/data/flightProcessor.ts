@@ -192,6 +192,13 @@ export interface FlightStatistics {
     name: string;
     count: number;
   };
+  mostFrequentRoute?: {
+    from: string;
+    to: string;
+    fromName: string;
+    toName: string;
+    count: number;
+  };
 }
 
 /**
@@ -205,6 +212,11 @@ export const calculateFlightStatistics = (flights: Flight[], airports: Airport[]
   let totalDistance = 0;
   const destinationCounts = new Map<string, number>();
   const airlineCounts = new Map<string, number>();
+  const routeCounts = new Map<string, {
+    from: string;
+    to: string;
+    count: number;
+  }>();
   const airportIndex = buildAirportIndex(airports);
 
   let maxDistance = -1;
@@ -251,6 +263,16 @@ export const calculateFlightStatistics = (flights: Flight[], airports: Airport[]
 
     destinationCounts.set(flight.arrivalAirport, (destinationCounts.get(flight.arrivalAirport) || 0) + 1);
 
+    const from = flight.departureAirport;
+    const to = flight.arrivalAirport;
+    const routeKey = `${from}-${to}`;
+    const route = routeCounts.get(routeKey);
+    routeCounts.set(routeKey, {
+      from,
+      to,
+      count: (route?.count || 0) + 1,
+    });
+
     // 统计航司
     const airlineCode = flight.flightNumber.substring(0, 2);
     airlineCounts.set(airlineCode, (airlineCounts.get(airlineCode) || 0) + 1);
@@ -280,6 +302,16 @@ export const calculateFlightStatistics = (flights: Flight[], airports: Airport[]
       };
   }
 
+  const mostFrequentRouteRaw = Array.from(routeCounts.values())
+    .sort((a, b) => b.count - a.count)[0];
+  const mostFrequentRoute = mostFrequentRouteRaw
+    ? {
+        ...mostFrequentRouteRaw,
+        fromName: airportIndex.get(mostFrequentRouteRaw.from)?.name || mostFrequentRouteRaw.from,
+        toName: airportIndex.get(mostFrequentRouteRaw.to)?.name || mostFrequentRouteRaw.to,
+      }
+    : undefined;
+
   return {
     totalFlights,
     totalDistance: Math.round(totalDistance), // 四舍五入到整数
@@ -287,6 +319,7 @@ export const calculateFlightStatistics = (flights: Flight[], airports: Airport[]
     longestFlight,
     shortestFlight,
     topAirline,
+    mostFrequentRoute,
   };
 };
 

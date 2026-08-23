@@ -42,22 +42,28 @@ test('可以按城市查询多个机场的历史行程', async ({ page }) => {
   await expect(page.getByRole('button', { name: /MF8703/ })).toHaveCount(0);
 });
 
-test('纪念模式展示全量生涯数据并可导出 PNG', async ({ page }, testInfo) => {
+test('全景模式展示完整飞行数据并可导出 PNG', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-chromium', 'PNG 导出仅需在桌面项目验证一次');
 
   await page.getByLabel('城市或机场').fill('北京');
   await page.getByRole('tab', { name: '概览' }).click();
-  await page.getByRole('button', { name: /生成职业飞行纪念图/ }).click();
+  await page.getByRole('button', { name: /生成飞行轨迹总览/ }).click();
 
-  await expect(page.getByText('我的职业飞行纪事')).toBeVisible();
+  await expect(page.getByText('飞行轨迹总览')).toBeVisible();
+  await expect(page.getByText('累计飞行次数')).toBeVisible();
+  await expect(page.getByText('记录区间')).toBeVisible();
   await expect(page.getByText('44', { exact: true })).toBeVisible();
   await expect(page.getByText('111,874')).toBeVisible();
   await expect(page.getByText(/沿地球赤道飞行/)).toContainText('2.8 圈');
+  await expect(page.getByText('最长距离航线')).toBeVisible();
+  await expect(page.getByText(/上海浦东 → 西雅图塔科马/)).toContainText('9,187 km');
+  await expect(page.getByText('最高频率航线')).toBeVisible();
+  await expect(page.getByText(/新加坡樟宜 → 杭州萧山/)).toContainText('8 段');
   await expect(page.locator('.career-airport-label')).toHaveCount(30);
   await expect(page.locator('.flight-path-poster')).toHaveCount(44);
 
   const downloadPromise = page.waitForEvent('download');
-  await page.getByRole('button', { name: '下载纪念图' }).click();
+  await page.getByRole('button', { name: '导出飞行轨迹图' }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe('flight-path-chronicle-2021-2026.png');
   const path = await download.path();

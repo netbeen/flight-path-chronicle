@@ -193,8 +193,8 @@ const FloatingStatsPanel: React.FC<FloatingStatsPanelProps> = ({
                     className="flex w-full items-center justify-between rounded-md border border-blue-400/20 bg-blue-500/10 px-3 py-3 text-left transition-colors hover:border-blue-300/40 hover:bg-blue-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                   >
                     <span>
-                      <span className="block text-sm font-semibold text-blue-100">生成职业飞行纪念图</span>
-                      <span className="mt-0.5 block text-xs text-gray-400">以全部航班生成可下载的全景轨迹</span>
+                      <span className="block text-sm font-semibold text-blue-100">生成飞行轨迹总览</span>
+                      <span className="mt-0.5 block text-xs text-gray-400">基于全部航班生成可导出的全景视图</span>
                     </span>
                     <ImageDown className="h-5 w-5 flex-shrink-0 text-blue-300" aria-hidden="true" />
                   </button>
