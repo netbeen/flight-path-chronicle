@@ -61,6 +61,18 @@ describe('flightProcessor', () => {
         expect(flight.distance).toBeLessThan(1300);
     });
 
+    it('should cap curvature for frequently repeated routes', () => {
+        const repeatedFlights = Array.from({ length: 8 }, (_, index) => ({
+            ...mockFlights[0],
+            flightNumber: `CA${1200 + index}`,
+            departureTime: `2023-01-${String(index + 1).padStart(2, '0')}T10:00:00Z`,
+        }));
+
+        const processed = processFlights(repeatedFlights, mockAirports);
+        expect(processed).toHaveLength(8);
+        expect(Math.max(...processed.map(flight => flight.curvature))).toBe(0.6);
+    });
+
     it('should handle date line crossing correctly', () => {
         // EAST (170) -> WEST (-170 -> 190). Diff = 20. No crossing logic triggered in current implementation unless diff > 180.
         // Wait, current logic:

@@ -1,100 +1,112 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { ChevronLeft, ChevronRight, ListRestart, Pause, Play } from 'lucide-react';
+import { ProcessedFlight } from '@/data/flightProcessor';
 
 interface TimelineControllerProps {
-  startDate: string; // ISO string of earliest flight
-  endDate: string;   // ISO string of latest flight
-  currentDate: string | null; // Currently displayed date
-  onDateChange: (date: string | null) => void;
+  flights: ProcessedFlight[];
+  currentIndex: number | null;
+  onIndexChange: (index: number | null) => void;
   isPlaying: boolean;
   onPlayPause: () => void;
 }
 
 const TimelineController: React.FC<TimelineControllerProps> = ({
-  startDate,
-  endDate,
-  currentDate,
-  onDateChange,
+  flights,
+  currentIndex,
+  onIndexChange,
   isPlaying,
   onPlayPause,
 }) => {
-  const [progress, setProgress] = useState(100); // 0-100 percentage
-  const startTimestamp = new Date(startDate).getTime();
-  const endTimestamp = new Date(endDate).getTime();
-  const totalDuration = endTimestamp - startTimestamp;
-
-  // Sync internal progress with external currentDate
-  useEffect(() => {
-    if (currentDate) {
-      const current = new Date(currentDate).getTime();
-      const newProgress = Math.min(100, Math.max(0, ((current - startTimestamp) / totalDuration) * 100));
-      setProgress(newProgress);
-    } else {
-        // If null (show all), set to 100%
-        setProgress(100);
-    }
-  }, [currentDate, startTimestamp, totalDuration]);
-
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newProgress = parseFloat(e.target.value);
-    setProgress(newProgress);
-    
-    // Calculate new date based on progress
-    const newTime = startTimestamp + (totalDuration * (newProgress / 100));
-    const newDate = new Date(newTime).toISOString();
-    onDateChange(newDate);
+    onIndexChange(Number(e.target.value));
   };
 
-  const formatDisplayDate = (dateStr: string | null) => {
-    if (!dateStr) return '全部展示';
-    return new Date(dateStr).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
-  };
+  const activeFlight = currentIndex === null ? null : flights[currentIndex];
+  const canGoPrevious = currentIndex !== null && currentIndex > 0;
+  const canGoNext = flights.length > 0 && (currentIndex === null || currentIndex < flights.length - 1);
 
   return (
-    <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 w-full max-w-2xl px-4 z-[1000]">
-      <div className="bg-gray-900/80 backdrop-blur-md border border-white/10 rounded-full shadow-2xl p-4 flex items-center gap-4 text-white">
-        
-        {/* Play/Pause Button */}
-        <button 
-          onClick={onPlayPause}
-          className="w-10 h-10 rounded-full bg-blue-500 hover:bg-blue-600 flex items-center justify-center transition-colors flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-blue-400"
-        >
-          {isPlaying ? (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-          ) : (
-             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-            </svg>
-          )}
-        </button>
+    <div className="timeline-shell absolute bottom-5 left-1/2 z-[1000] w-full max-w-3xl -translate-x-1/2 px-4">
+      <div className="rounded-lg border border-white/10 bg-gray-950/88 p-3 text-white shadow-2xl backdrop-blur-md">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onIndexChange(Math.max(0, (currentIndex ?? 0) - 1))}
+            disabled={!canGoPrevious}
+            className="timeline-icon-button"
+            aria-label="上一段行程"
+            title="上一段行程"
+          >
+            <ChevronLeft aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={onPlayPause}
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-blue-500 text-white transition-colors hover:bg-blue-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label={isPlaying ? '暂停回放' : '播放行程'}
+            title={isPlaying ? '暂停回放' : '播放行程'}
+            disabled={flights.length === 0}
+          >
+            {isPlaying ? <Pause className="h-5 w-5" aria-hidden="true" /> : <Play className="h-5 w-5" aria-hidden="true" />}
+          </button>
+          <button
+            type="button"
+            onClick={() => onIndexChange(Math.min(flights.length - 1, (currentIndex ?? -1) + 1))}
+            disabled={!canGoNext}
+            className="timeline-icon-button"
+            aria-label="下一段行程"
+            title="下一段行程"
+          >
+            <ChevronRight aria-hidden="true" />
+          </button>
 
-        {/* Date Display */}
-        <div className="flex-shrink-0 w-32 font-mono text-sm text-center font-bold text-blue-200">
-          {formatDisplayDate(currentDate)}
-        </div>
-
-        {/* Slider */}
-        <div className="flex-1 relative flex items-center">
-            <input 
-                type="range" 
-                min="0" 
-                max="100" 
-                step="0.1"
-                value={progress} 
-                onChange={handleSliderChange}
-                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400"
+          <div className="min-w-0 flex-1 px-2">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-blue-100">
+                  {activeFlight
+                    ? `${activeFlight.departureAirport} → ${activeFlight.arrivalAirport}`
+                    : '全部行程'}
+                </p>
+                <p className="truncate text-xs text-gray-400">
+                  {activeFlight
+                    ? `${currentIndex! + 1} / ${flights.length} · ${new Date(activeFlight.departureTime).toLocaleDateString('zh-CN')} · ${activeFlight.flightNumber}`
+                    : `共 ${flights.length} 段航班`}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onIndexChange(null)}
+                disabled={currentIndex === null}
+                className="hidden h-9 flex-shrink-0 items-center gap-2 rounded-md px-3 text-sm text-blue-300 transition-colors hover:bg-blue-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 disabled:text-gray-600 sm:flex"
+              >
+                <ListRestart className="h-4 w-4" aria-hidden="true" />
+                查看全部
+              </button>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max={Math.max(0, flights.length - 1)}
+              step="1"
+              value={currentIndex ?? Math.max(0, flights.length - 1)}
+              onChange={handleSliderChange}
+              disabled={flights.length <= 1}
+              aria-label="行程进度"
+              className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-700 accent-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
             />
+          </div>
+          <button
+            type="button"
+            onClick={() => onIndexChange(null)}
+            disabled={currentIndex === null}
+            className="timeline-icon-button sm:hidden"
+            aria-label="查看全部行程"
+            title="查看全部行程"
+          >
+            <ListRestart aria-hidden="true" />
+          </button>
         </div>
-        
-        {/* Toggle Mode Button (Show All vs Timeline) */}
-        <button
-            onClick={() => onDateChange(null)}
-            className={`text-xs px-3 py-1 rounded-md transition-colors ${!currentDate ? 'bg-blue-500/20 text-blue-300' : 'text-gray-400 hover:text-white'}`}
-        >
-            查看全部
-        </button>
-
       </div>
     </div>
   );

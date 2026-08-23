@@ -1,9 +1,23 @@
 import React, { useMemo, useState } from 'react';
-import { Flight, Airport } from '@/data';
-import { calculateFlightStatistics, AIRLINE_NAMES } from '@/data/flightProcessor';
+import {
+  BarChart3,
+  ChevronDown,
+  ChevronUp,
+  History,
+  MapPin,
+  Plane,
+  RotateCcw,
+} from 'lucide-react';
+import { Airport } from '@/data';
+import {
+  calculateFlightStatistics,
+  AIRLINE_NAMES,
+  ProcessedFlight,
+} from '@/data/flightProcessor';
+import { getFlightId } from '@/components/flightUiTypes';
 
 interface FloatingStatsPanelProps {
-  flights: Flight[];
+  flights: ProcessedFlight[];
   airports: Airport[];
   years: string[];
   airlines: string[];
@@ -11,7 +25,9 @@ interface FloatingStatsPanelProps {
   selectedAirline: string | 'all';
   onYearChange: (year: string | 'all') => void;
   onAirlineChange: (airline: string | 'all') => void;
-  onDestinationHover: (code: string | null) => void;
+  onDestinationClick: (code: string) => void;
+  onFlightClick: (flight: ProcessedFlight) => void;
+  selectedFlightId: string | null;
 }
 
 const FloatingStatsPanel: React.FC<FloatingStatsPanelProps> = ({
@@ -23,51 +39,90 @@ const FloatingStatsPanel: React.FC<FloatingStatsPanelProps> = ({
   selectedAirline,
   onYearChange,
   onAirlineChange,
-  onDestinationHover,
+  onDestinationClick,
+  onFlightClick,
+  selectedFlightId,
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [activeTab, setActiveTab] = useState<'overview' | 'history'>('overview');
   
-  // Calculate stats based on current filtered flights
   const stats = useMemo(() => calculateFlightStatistics(flights, airports), [flights, airports]);
+  const airportIndex = useMemo(
+    () => new Map(airports.map((airport) => [airport.code, airport])),
+    [airports],
+  );
+  const groupedFlights = useMemo(() => {
+    const groups = new Map<string, ProcessedFlight[]>();
+    [...flights]
+      .sort((a, b) => new Date(b.departureTime).getTime() - new Date(a.departureTime).getTime())
+      .forEach((flight) => {
+        const year = new Date(flight.departureTime).getFullYear().toString();
+        groups.set(year, [...(groups.get(year) || []), flight]);
+      });
+    return Array.from(groups.entries());
+  }, [flights]);
+
+  const clearFilters = () => {
+    onYearChange('all');
+    onAirlineChange('all');
+  };
 
   return (
-    <div className={`absolute top-4 left-4 z-[1100] transition-all duration-300 ${isCollapsed ? 'w-auto' : 'w-80'}`}>
-      <div className="bg-gray-900/80 backdrop-blur-md border border-white/10 rounded-xl shadow-2xl overflow-hidden text-white">
-        {/* Header */}
-        <div className="p-4 border-b border-white/10 flex justify-between items-center bg-black/20">
+    <aside className={`flight-panel absolute z-[1100] transition-[width,max-height] duration-300 ${isCollapsed ? 'is-collapsed' : ''}`}>
+      <div className="h-full overflow-hidden rounded-lg border border-white/10 bg-gray-950/88 text-white shadow-2xl backdrop-blur-md">
+        <div className="flex items-center justify-between border-b border-white/10 bg-black/20 p-4">
           <div className="flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-            </svg>
-            <h3 className={`font-bold text-lg ${isCollapsed ? 'hidden' : 'block'}`}>飞行统计</h3>
+            <Plane className="h-5 w-5 text-blue-400" aria-hidden="true" />
+            <h1 className={`text-lg font-bold ${isCollapsed ? 'hidden' : 'block'}`}>飞行纪事</h1>
           </div>
           <button 
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="p-1 hover:bg-white/10 rounded-lg transition-colors"
+            className="flex h-9 w-9 items-center justify-center rounded-md text-gray-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+            aria-label={isCollapsed ? '展开面板' : '收起面板'}
+            title={isCollapsed ? '展开面板' : '收起面板'}
           >
-            {isCollapsed ? (
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
-              </svg>
-            ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
-              </svg>
-            )}
+            {isCollapsed ? <ChevronUp aria-hidden="true" /> : <ChevronDown aria-hidden="true" />}
           </button>
         </div>
 
-        {/* Content */}
         {!isCollapsed && (
-          <div className="p-5 space-y-6 max-h-[80vh] overflow-y-auto custom-scrollbar">
-            {/* Filters */}
-            <div className="grid grid-cols-2 gap-3">
+          <>
+            <div className="grid grid-cols-2 border-b border-white/10 p-2" role="tablist" aria-label="飞行信息">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'overview'}
+                onClick={() => setActiveTab('overview')}
+                className={`flex h-9 items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === 'overview' ? 'bg-blue-500/20 text-blue-200' : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                }`}
+              >
+                <BarChart3 className="h-4 w-4" aria-hidden="true" />
+                概览
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'history'}
+                onClick={() => setActiveTab('history')}
+                className={`flex h-9 items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === 'history' ? 'bg-blue-500/20 text-blue-200' : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                }`}
+              >
+                <History className="h-4 w-4" aria-hidden="true" />
+                行程
+                <span className="font-mono text-xs text-gray-400">{flights.length}</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 border-b border-white/10 p-4">
               <div>
-                <label className="block text-xs text-gray-400 mb-1 uppercase font-semibold">年份</label>
+                <label className="mb-1 block text-xs font-semibold text-gray-400" htmlFor="year-filter">年份</label>
                 <select 
+                  id="year-filter"
                   value={selectedYear}
                   onChange={(e) => onYearChange(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-white/10 transition-colors"
+                  className="w-full rounded-md border border-white/10 bg-gray-800 px-3 py-2 text-sm transition-colors hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="all">全部年份</option>
                   {years.map(year => (
@@ -76,11 +131,12 @@ const FloatingStatsPanel: React.FC<FloatingStatsPanelProps> = ({
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-gray-400 mb-1 uppercase font-semibold">航空公司</label>
+                <label className="mb-1 block text-xs font-semibold text-gray-400" htmlFor="airline-filter">航空公司</label>
                 <select 
+                  id="airline-filter"
                   value={selectedAirline}
                   onChange={(e) => onAirlineChange(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-white/10 transition-colors"
+                  className="w-full rounded-md border border-white/10 bg-gray-800 px-3 py-2 text-sm transition-colors hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="all">全部航司</option>
                   {airlines.map(code => (
@@ -90,79 +146,163 @@ const FloatingStatsPanel: React.FC<FloatingStatsPanelProps> = ({
               </div>
             </div>
 
-            {/* Main Stats */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white/5 p-3 rounded-lg border border-white/5">
-                <p className="text-gray-400 text-xs mb-1">总里程</p>
-                <p className="text-xl font-bold text-blue-300">{stats.totalDistance.toLocaleString()}</p>
-                <p className="text-xs text-gray-500">公里</p>
-              </div>
-              <div className="bg-white/5 p-3 rounded-lg border border-white/5">
-                <p className="text-gray-400 text-xs mb-1">飞行次数</p>
-                <p className="text-xl font-bold text-green-300">{stats.totalFlights}</p>
-                <p className="text-xs text-gray-500">次</p>
-              </div>
-            </div>
+            <div className="panel-scroll custom-scrollbar overflow-y-auto">
+              {activeTab === 'overview' ? (
+                <div className="space-y-5 p-4" role="tabpanel">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-md border border-white/5 bg-white/5 p-3">
+                      <p className="mb-1 text-xs text-gray-400">总里程</p>
+                      <p className="text-xl font-bold text-blue-300">{stats.totalDistance.toLocaleString()}</p>
+                      <p className="text-xs text-gray-500">公里</p>
+                    </div>
+                    <div className="rounded-md border border-white/5 bg-white/5 p-3">
+                      <p className="mb-1 text-xs text-gray-400">飞行次数</p>
+                      <p className="text-xl font-bold text-emerald-300">{stats.totalFlights}</p>
+                      <p className="text-xs text-gray-500">次</p>
+                    </div>
+                  </div>
 
-            {/* Additional Stats */}
-            <div className="grid grid-cols-1 gap-3">
-              {stats.topAirline && (
-                <div className="flex justify-between items-center text-sm border-b border-white/5 pb-2">
-                  <span className="text-gray-400">最爱航司</span>
-                  <span className="font-semibold text-purple-300">
-                    {stats.topAirline.name} <span className="text-xs text-gray-500">({stats.topAirline.count}次)</span>
-                  </span>
+                  <div className="grid grid-cols-1 gap-3">
+                    {stats.topAirline && (
+                      <div className="flex items-center justify-between border-b border-white/5 pb-2 text-sm">
+                        <span className="text-gray-400">最爱航司</span>
+                        <span className="font-semibold text-fuchsia-300">
+                          {stats.topAirline.name} <span className="text-xs text-gray-500">({stats.topAirline.count}次)</span>
+                        </span>
+                      </div>
+                    )}
+                    {stats.longestFlight && (
+                      <div className="border-b border-white/5 pb-2 text-sm">
+                        <span className="mb-1 block text-gray-400">最长航线</span>
+                        <div className="flex flex-wrap justify-between gap-1">
+                          <span className="font-semibold">{stats.longestFlight.fromName} → {stats.longestFlight.toName}</span>
+                          <span className="whitespace-nowrap text-blue-300">{stats.longestFlight.distance.toLocaleString()} km</span>
+                        </div>
+                      </div>
+                    )}
+                    {stats.shortestFlight && (
+                      <div className="border-b border-white/5 pb-2 text-sm">
+                        <span className="mb-1 block text-gray-400">最短航线</span>
+                        <div className="flex flex-wrap justify-between gap-1">
+                          <span className="font-semibold">{stats.shortestFlight.fromName} → {stats.shortestFlight.toName}</span>
+                          <span className="whitespace-nowrap text-emerald-300">{stats.shortestFlight.distance.toLocaleString()} km</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <section aria-labelledby="top-destinations">
+                    <h2 id="top-destinations" className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-300">
+                      <MapPin className="h-4 w-4 text-amber-400" aria-hidden="true" />
+                      热门目的地
+                    </h2>
+                    <ol className="space-y-1">
+                      {stats.topDestinations.map((dest, index) => (
+                        <li key={dest.code}>
+                          <button
+                            type="button"
+                            className="group flex min-h-10 w-full items-center justify-between rounded-md px-2 text-left text-sm transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+                            onClick={() => onDestinationClick(dest.code)}
+                          >
+                            <span className="flex min-w-0 items-center">
+                              <span className={`mr-3 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-xs font-mono ${
+                                index < 3 ? 'border border-amber-500/30 bg-amber-500/20 text-amber-300' : 'bg-gray-700 text-gray-400'
+                              }`}>
+                                {index + 1}
+                              </span>
+                              <span className="truncate transition-colors group-hover:text-blue-300">{dest.name}</span>
+                            </span>
+                            <span className="ml-2 font-mono text-gray-400">{dest.count}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ol>
+                  </section>
+                </div>
+              ) : (
+                <div className="p-3" role="tabpanel">
+                  {groupedFlights.length > 0 ? (
+                    groupedFlights.map(([year, yearFlights]) => (
+                      <section key={year} className="mb-4 last:mb-0" aria-labelledby={`year-${year}`}>
+                        <div className="sticky top-0 z-10 flex items-center justify-between bg-gray-950/95 px-1 py-2 backdrop-blur">
+                          <h2 id={`year-${year}`} className="text-sm font-bold text-gray-200">{year}</h2>
+                          <span className="text-xs text-gray-500">{yearFlights.length} 段</span>
+                        </div>
+                        <div className="space-y-1">
+                          {yearFlights.map((flight) => {
+                            const id = getFlightId(flight);
+                            const departure = airportIndex.get(flight.departureAirport);
+                            const arrival = airportIndex.get(flight.arrivalAirport);
+                            const departureTime = new Date(flight.departureTime);
+                            const arrivalTime = new Date(flight.arrivalTime);
+                            return (
+                              <button
+                                type="button"
+                                key={id}
+                                data-flight-id={id}
+                                aria-pressed={selectedFlightId === id}
+                                onClick={() => onFlightClick(flight)}
+                                className={`w-full rounded-md border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
+                                  selectedFlightId === id
+                                    ? 'border-blue-400/50 bg-blue-500/15'
+                                    : 'border-transparent hover:border-white/10 hover:bg-white/5'
+                                }`}
+                              >
+                                <div className="mb-2 flex items-center justify-between gap-3">
+                                  <span className="text-xs text-gray-400">
+                                    {departureTime.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', weekday: 'short' })}
+                                  </span>
+                                  <span className="font-mono text-xs font-semibold text-blue-300">{flight.flightNumber}</span>
+                                </div>
+                                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                                  <div className="min-w-0">
+                                    <strong className="block text-lg">{flight.departureAirport}</strong>
+                                    <span className="block truncate text-xs text-gray-500">{departure?.name || flight.departureAirport}</span>
+                                    <span className="mt-1 block font-mono text-xs text-gray-400">
+                                      {departureTime.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                  </div>
+                                  <Plane className="h-4 w-4 text-gray-500" aria-hidden="true" />
+                                  <div className="min-w-0 text-right">
+                                    <strong className="block text-lg">{flight.arrivalAirport}</strong>
+                                    <span className="block truncate text-xs text-gray-500">{arrival?.name || flight.arrivalAirport}</span>
+                                    <span className="mt-1 block font-mono text-xs text-gray-400">
+                                      {arrivalTime.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                  </div>
+                                </div>
+                                {flight.distance !== undefined && (
+                                  <div className="mt-2 border-t border-white/5 pt-2 text-right font-mono text-xs text-gray-500">
+                                    {flight.distance.toLocaleString()} km
+                                  </div>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </section>
+                    ))
+                  ) : (
+                    <div className="flex min-h-48 flex-col items-center justify-center px-6 text-center">
+                      <History className="mb-3 h-7 w-7 text-gray-600" aria-hidden="true" />
+                      <p className="text-sm font-medium text-gray-300">没有符合条件的行程</p>
+                      <button
+                        type="button"
+                        onClick={clearFilters}
+                        className="mt-4 flex items-center gap-2 rounded-md px-3 py-2 text-sm text-blue-300 hover:bg-blue-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+                      >
+                        <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                        清除筛选
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
-              {stats.longestFlight && (
-                 <div className="flex flex-col text-sm border-b border-white/5 pb-2">
-                    <span className="text-gray-400 mb-1">最长航线</span>
-                    <div className="flex justify-between flex-wrap gap-1">
-                        <span className="font-semibold">{stats.longestFlight.fromName} → {stats.longestFlight.toName}</span>
-                        <span className="text-blue-300 whitespace-nowrap">{stats.longestFlight.distance.toLocaleString()} km</span>
-                    </div>
-                 </div>
-              )}
-              {stats.shortestFlight && (
-                 <div className="flex flex-col text-sm border-b border-white/5 pb-2">
-                    <span className="text-gray-400 mb-1">最短航线</span>
-                    <div className="flex justify-between flex-wrap gap-1">
-                        <span className="font-semibold">{stats.shortestFlight.fromName} → {stats.shortestFlight.toName}</span>
-                        <span className="text-green-300 whitespace-nowrap">{stats.shortestFlight.distance.toLocaleString()} km</span>
-                    </div>
-                 </div>
-              )}
             </div>
-
-            {/* Top Destinations */}
-            <div>
-              <h4 className="text-sm font-semibold text-gray-300 mb-3 flex items-center">
-                <span className="w-1.5 h-1.5 rounded-full bg-orange-400 mr-2"></span>
-                热门目的地
-              </h4>
-              <ul className="space-y-2">
-                {stats.topDestinations.map((dest, index) => (
-                  <li 
-                    key={dest.code}
-                    className="flex justify-between items-center text-sm p-2 rounded-md hover:bg-white/10 cursor-pointer transition-colors group"
-                    onMouseEnter={() => onDestinationHover(dest.code)}
-                    onMouseLeave={() => onDestinationHover(null)}
-                  >
-                    <div className="flex items-center">
-                      <span className={`w-5 h-5 rounded flex items-center justify-center text-xs mr-3 font-mono ${index < 3 ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' : 'bg-gray-700 text-gray-400'}`}>
-                        {index + 1}
-                      </span>
-                      <span className="group-hover:text-blue-300 transition-colors">{dest.name}</span>
-                    </div>
-                    <span className="font-mono text-gray-400">{dest.count}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
+          </>
         )}
       </div>
-    </div>
+    </aside>
   );
 };
 

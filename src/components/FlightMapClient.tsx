@@ -1,13 +1,19 @@
 "use client";
 
 import dynamic from 'next/dynamic';
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { Flight } from '@/data/flight';
 import { Airport } from '@/data/airport';
 import Sidebar from '@/components/Sidebar';
 import FloatingStatsPanel from '@/components/FloatingStatsPanel';
 import TimelineController from '@/components/TimelineController';
-import { getAvailableYears, getAvailableAirlines, ProcessedFlight } from '@/data/flightProcessor';
+import {
+  getAvailableYears,
+  getAvailableAirlines,
+  processFlights,
+  ProcessedFlight,
+} from '@/data/flightProcessor';
+import { getFlightId, MapCommand } from '@/components/flightUiTypes';
 
 // 使用 next/dynamic 动态导入 FlightMap 组件，并禁用 SSR
 const FlightMap = dynamic(() => import('@/components/FlightMap'), { 
@@ -37,12 +43,12 @@ interface FlightMapClientProps {
 export default function FlightMapClient({ flights, airports }: FlightMapClientProps) {
   const [selectedYear, setSelectedYear] = useState<string>('all');
   const [selectedAirline, setSelectedAirline] = useState<string>('all');
-  const [selectedItem, setSelectedItem] = useState<Airport | Flight | null>(null);
+  const [selectedItem, setSelectedItem] = useState<Airport | ProcessedFlight | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
-  const [focusedLocation, setFocusedLocation] = useState<{ lat: number; lng: number; zoom?: number } | null>(null);
+  const [mapCommand, setMapCommand] = useState<MapCommand | null>(null);
+  const mapCommandId = useRef(0);
   
-  // Timeline states
-  const [currentDate, setCurrentDate] = useState<string | null>(null);
+  const [currentFlightIndex, setCurrentFlightIndex] = useState<number | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -50,17 +56,8 @@ export default function FlightMapClient({ flights, airports }: FlightMapClientPr
   const years = useMemo(() => getAvailableYears(flights), [flights]);
   const airlines = useMemo(() => getAvailableAirlines(flights), [flights]);
 
-  // Sort flights by date
-  const sortedFlights = useMemo(() => {
-    return [...flights].sort((a, b) => new Date(a.departureTime).getTime() - new Date(b.departureTime).getTime());
-  }, [flights]);
-
-  const startDate = sortedFlights[0]?.departureTime;
-  const endDate = sortedFlights[sortedFlights.length - 1]?.departureTime;
-
-  // 根据条件筛选航班
   const filteredFlights = useMemo(() => {
-    let result = flights.filter(flight => {
+    const result = flights.filter(flight => {
       const year = new Date(flight.departureTime).getFullYear().toString();
       const airlineCode = flight.flightNumber.substring(0, 2);
       
@@ -70,89 +67,137 @@ export default function FlightMapClient({ flights, airports }: FlightMapClientPr
       return yearMatch && airlineMatch;
     });
 
-    // Apply timeline filter if currentDate is set
-    if (currentDate) {
-        const currentTime = new Date(currentDate).getTime();
-        result = result.filter(flight => new Date(flight.departureTime).getTime() <= currentTime);
-    }
+    return processFlights(result, airports).sort(
+      (a, b) => new Date(a.departureTime).getTime() - new Date(b.departureTime).getTime(),
+    );
+  }, [flights, airports, selectedYear, selectedAirline]);
 
-    return result;
-  }, [flights, selectedYear, selectedAirline, currentDate]);
+  const visibleFlights = useMemo(
+    () => currentFlightIndex === null
+      ? filteredFlights
+      : filteredFlights.slice(0, currentFlightIndex + 1),
+    [filteredFlights, currentFlightIndex],
+  );
 
-  // Timeline playback logic
+  const activeTimelineFlight = currentFlightIndex === null
+    ? null
+    : filteredFlights[currentFlightIndex] || null;
+
+  const selectedFlightId = selectedItem
+    ? 'flightNumber' in selectedItem
+      ? getFlightId(selectedItem)
+      : null
+    : activeTimelineFlight
+      ? getFlightId(activeTimelineFlight)
+      : null;
+
   useEffect(() => {
-    if (isPlaying) {
+    if (isPlaying && filteredFlights.length > 0) {
       timerRef.current = setInterval(() => {
-        setCurrentDate(prev => {
-          if (!prev) return startDate; // If null, start from beginning
-          const current = new Date(prev).getTime();
-          const end = new Date(endDate).getTime();
-          const start = new Date(startDate).getTime();
-          const duration = end - start;
-          const step = duration / 200; // Divide total duration into 200 steps
-          
-          const nextTime = current + step;
-          if (nextTime >= end) {
+        setCurrentFlightIndex((previousIndex) => {
+          const nextIndex = previousIndex === null ? 0 : previousIndex + 1;
+          if (nextIndex >= filteredFlights.length) {
             setIsPlaying(false);
-            return endDate;
+            return filteredFlights.length - 1;
           }
-          return new Date(nextTime).toISOString();
+          return nextIndex;
         });
-      }, 50); // Update every 50ms
+      }, 800);
     } else if (timerRef.current) {
       clearInterval(timerRef.current);
+      timerRef.current = null;
     }
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [isPlaying, startDate, endDate]);
+  }, [isPlaying, filteredFlights.length]);
 
   const handlePlayPause = () => {
-      if (!currentDate) {
-          setCurrentDate(startDate);
-      }
-      setIsPlaying(!isPlaying);
+    if (filteredFlights.length === 0) return;
+    if (!isPlaying && (currentFlightIndex === null || currentFlightIndex >= filteredFlights.length - 1)) {
+      setCurrentFlightIndex(0);
+    }
+    if (!isPlaying) {
+      setSelectedItem(null);
+      setIsSidebarOpen(false);
+    }
+    setIsPlaying((playing) => !playing);
   };
 
+  const handleTimelineIndexChange = useCallback((index: number | null) => {
+    setIsPlaying(false);
+    setCurrentFlightIndex(index);
+    setSelectedItem(null);
+    setIsSidebarOpen(false);
+  }, []);
 
-  // 获取选中项目的相关航班（仅针对机场）
   const relatedFlights = useMemo(() => {
-    if (!selectedItem || !('code' in selectedItem)) return []; // selectedItem is not Airport
-    const code = (selectedItem as Airport).code;
-    // 这里选择使用 filteredFlights，让用户看到在当前筛选条件下的相关航班
+    if (!selectedItem || !('code' in selectedItem)) return [];
+    const code = selectedItem.code;
     return filteredFlights.filter(f => f.departureAirport === code || f.arrivalAirport === code)
       .sort((a, b) => new Date(b.departureTime).getTime() - new Date(a.departureTime).getTime());
   }, [selectedItem, filteredFlights]);
 
-  const handleAirportClick = (airport: Airport) => {
+  const handleAirportClick = useCallback((airport: Airport) => {
     setSelectedItem(airport);
     setIsSidebarOpen(true);
-    // 聚焦到该机场
-    setFocusedLocation({ lat: airport.latitude, lng: airport.longitude, zoom: 6 });
-  };
+    setMapCommand({
+      id: ++mapCommandId.current,
+      type: 'airport',
+      lat: airport.latitude,
+      lng: airport.longitude,
+      zoom: 6,
+    });
+  }, []);
 
-  const handleFlightClick = (flight: ProcessedFlight) => {
+  const handleFlightClick = useCallback((flight: ProcessedFlight) => {
     setSelectedItem(flight);
     setIsSidebarOpen(true);
-  };
-
-  const handleDestinationHover = (code: string | null) => {
-    if (code) {
-      const airport = airports.find(a => a.code === code);
-      if (airport) {
-        setFocusedLocation({ lat: airport.latitude, lng: airport.longitude, zoom: 6 });
-      }
+    const index = filteredFlights.findIndex((candidate) => getFlightId(candidate) === getFlightId(flight));
+    if (index >= 0) {
+      setCurrentFlightIndex(index);
     }
-  };
+    const departure = airports.find((airport) => airport.code === flight.departureAirport);
+    const arrival = airports.find((airport) => airport.code === flight.arrivalAirport);
+    if (departure && arrival) {
+      const departureLng = departure.longitude < 0 ? departure.longitude + 360 : departure.longitude;
+      const arrivalLng = flight.arrivalAirportModified?.longitude
+        ?? (arrival.longitude < 0 ? arrival.longitude + 360 : arrival.longitude);
+      setMapCommand({
+        id: ++mapCommandId.current,
+        type: 'flight',
+        bounds: [
+          [departure.latitude, departureLng],
+          [arrival.latitude, arrivalLng],
+        ],
+      });
+    }
+  }, [airports, filteredFlights]);
 
-  const closeSidebar = () => {
+  const handleDestinationClick = useCallback((code: string) => {
+    const airport = airports.find((candidate) => candidate.code === code);
+    if (airport) handleAirportClick(airport);
+  }, [airports, handleAirportClick]);
+
+  const closeSidebar = useCallback(() => {
     setIsSidebarOpen(false);
     setSelectedItem(null);
-  };
+  }, []);
+
+  const handleMapBackgroundClick = useCallback(() => {
+    setSelectedItem(null);
+    setIsSidebarOpen(false);
+  }, []);
+
+  useEffect(() => {
+    setIsPlaying(false);
+    setCurrentFlightIndex(null);
+    setSelectedItem(null);
+    setIsSidebarOpen(false);
+  }, [selectedYear, selectedAirline]);
 
   return (
     <div className="relative h-screen w-full overflow-hidden">
-        {/* Floating Stats Panel */}
         <FloatingStatsPanel 
             flights={filteredFlights}
             airports={airports}
@@ -162,36 +207,38 @@ export default function FlightMapClient({ flights, airports }: FlightMapClientPr
             selectedAirline={selectedAirline}
             onYearChange={setSelectedYear}
             onAirlineChange={setSelectedAirline}
-            onDestinationHover={handleDestinationHover}
+            onDestinationClick={handleDestinationClick}
+            onFlightClick={handleFlightClick}
+            selectedFlightId={selectedFlightId}
         />
 
-        {/* Timeline Controller */}
-        {sortedFlights.length > 0 && (
+        {filteredFlights.length > 0 && (
             <TimelineController 
-                startDate={startDate}
-                endDate={endDate}
-                currentDate={currentDate}
-                onDateChange={setCurrentDate}
+                flights={filteredFlights}
+                currentIndex={currentFlightIndex}
+                onIndexChange={handleTimelineIndexChange}
                 isPlaying={isPlaying}
                 onPlayPause={handlePlayPause}
             />
         )}
 
-        {/* Sidebar */}
         <Sidebar 
             isOpen={isSidebarOpen}
             onClose={closeSidebar}
             selectedItem={selectedItem}
             relatedFlights={relatedFlights}
+            airports={airports}
+            onFlightClick={handleFlightClick}
         />
 
-        {/* Map */}
         <FlightMap 
-            flights={filteredFlights} 
+            flights={visibleFlights}
             airports={airports} 
             onAirportClick={handleAirportClick}
             onFlightClick={handleFlightClick}
-            focusedLocation={focusedLocation}
+            onMapBackgroundClick={handleMapBackgroundClick}
+            mapCommand={mapCommand}
+            selectedFlightId={selectedFlightId}
         />
     </div>
   );

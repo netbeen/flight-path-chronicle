@@ -8,6 +8,7 @@ import 'leaflet-polylinedecorator';
 import { Airport, Flight } from '@/data';
 import { processFlights, calculateAirportActivity, ProcessedFlight } from '@/data/flightProcessor';
 import { MAP_CONFIG } from '@/config/mapConfig';
+import { getFlightId, MapCommand } from '@/components/flightUiTypes';
 
 // --- Helper functions for Bezier curve calculation ---
 
@@ -61,16 +62,37 @@ interface FlightMapProps {
   airports: Airport[];
   onAirportClick: (airport: Airport) => void;
   onFlightClick: (flight: ProcessedFlight) => void;
-  focusedLocation: { lat: number; lng: number; zoom?: number } | null;
+  onMapBackgroundClick: () => void;
+  mapCommand: MapCommand | null;
+  selectedFlightId: string | null;
 }
 
-const FlightMap: React.FC<FlightMapProps> = ({ flights, airports, onAirportClick, onFlightClick, focusedLocation }) => {
+const FlightMap: React.FC<FlightMapProps> = ({
+  flights,
+  airports,
+  onAirportClick,
+  onFlightClick,
+  onMapBackgroundClick,
+  mapCommand,
+  selectedFlightId,
+}) => {
   // 将地图中心点调整为中国，以满足用户需求
   const center: L.LatLngExpression = MAP_CONFIG.defaultCenter;
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [map, setMap] = useState<L.Map | null>(null);
-  const pathsRef = useRef<Map<string, { path: L.Polyline; decorator: L.PolylineDecorator; hitArea: L.Polyline }>>(new Map());
+  const pathsRef = useRef<Map<string, {
+    path: L.Polyline;
+    decorator: L.PolylineDecorator;
+    hitArea: L.Polyline;
+    color: string;
+  }>>(new Map());
   const airportMarkersRef = useRef<L.Marker[]>([]);
+  const isAnimatingRef = useRef(false);
+  const selectedFlightIdRef = useRef(selectedFlightId);
+
+  useEffect(() => {
+    selectedFlightIdRef.current = selectedFlightId;
+  }, [selectedFlightId]);
 
   const getAirportByCode = (code: string): Airport | undefined => {
     return airports.find(airport => airport.code === code);
@@ -92,14 +114,42 @@ const FlightMap: React.FC<FlightMapProps> = ({ flights, airports, onAirportClick
     }
   }, [map]); // 此效果仅在 map 实例准备好后运行一次
 
-  // 监听焦点位置变化
   useEffect(() => {
-    if (map && focusedLocation) {
-      map.flyTo([focusedLocation.lat, focusedLocation.lng], focusedLocation.zoom || 5, {
-        duration: 1.5
+    if (!map || !mapCommand || isAnimatingRef.current) return;
+
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    isAnimatingRef.current = true;
+
+    if (mapCommand.type === 'airport') {
+      map.flyTo([mapCommand.lat, mapCommand.lng], mapCommand.zoom, {
+        animate: !reduceMotion,
+        duration: reduceMotion ? 0 : 0.8,
+      });
+    } else if (mapCommand.type === 'flight') {
+      map.fitBounds(mapCommand.bounds, {
+        animate: !reduceMotion,
+        duration: reduceMotion ? 0 : 0.8,
+        padding: [80, 80],
+        maxZoom: 6,
+      });
+    } else {
+      map.flyTo(MAP_CONFIG.defaultCenter, MAP_CONFIG.defaultZoom, {
+        animate: !reduceMotion,
+        duration: reduceMotion ? 0 : 0.8,
       });
     }
-  }, [map, focusedLocation]);
+
+    const releaseAnimationLock = () => {
+      isAnimatingRef.current = false;
+    };
+    map.once('moveend', releaseAnimationLock);
+    const fallback = window.setTimeout(releaseAnimationLock, reduceMotion ? 50 : 1200);
+    return () => {
+      window.clearTimeout(fallback);
+      map.off('moveend', releaseAnimationLock);
+      isAnimatingRef.current = false;
+    };
+  }, [map, mapCommand]);
 
   // 2. 将绘图逻辑移入一个单独的 useEffect，并依赖于 map 状态
   /**
@@ -118,7 +168,9 @@ const FlightMap: React.FC<FlightMapProps> = ({ flights, airports, onAirportClick
     if (!map) return; // 只有当地图实例准备好后才执行
 
     // 创建一个自定义的 Pane 用于渲染机场高亮点，并设置高 zIndex
-    map.createPane('airportHighlights');
+    if (!map.getPane('airportHighlights')) {
+      map.createPane('airportHighlights');
+    }
     const highlightPane = map.getPane('airportHighlights');
     if (highlightPane) {
       highlightPane.style.zIndex = '650';
@@ -138,7 +190,7 @@ const FlightMap: React.FC<FlightMapProps> = ({ flights, airports, onAirportClick
     airportActivity.forEach((count, code) => {
       const airport = getAirportByCode(code);
       if (airport) {
-        const size = 10 + count * 2; // 根据起降次数动态计算大小
+        const size = Math.min(34, 12 + Math.sqrt(count) * 3);
         const icon = L.divIcon({
           html: `<div class="airport-highlight cursor-pointer"></div>`,
           className: '',
@@ -238,17 +290,51 @@ const FlightMap: React.FC<FlightMapProps> = ({ flights, airports, onAirportClick
             onFlightClick(flight);
         });
 
+        const flightId = getFlightId(flight);
+
         hitArea.on('mouseover', () => {
           path.setStyle({ weight: 4, color: flight.color, opacity: 1 });
         });
         hitArea.on('mouseout', () => {
-          path.setStyle({ weight: 2, color: flight.color, opacity: 0.7 });
+          const currentSelection = selectedFlightIdRef.current;
+          const isSelected = currentSelection === flightId;
+          path.setStyle({
+            weight: isSelected ? 5 : 2,
+            color: flight.color,
+            opacity: isSelected ? 1 : currentSelection ? 0.22 : 0.62,
+          });
         });
 
-        pathsRef.current.set(`${flight.flightNumber}-${flight.departureTime}`, { path, decorator, hitArea });
+        pathsRef.current.set(flightId, {
+          path,
+          decorator,
+          hitArea,
+          color: flight.color,
+        });
       }
     });
   }, [map, processedFlights, airportActivity, airports, onAirportClick, onFlightClick]); // 3. 添加 map 到依赖数组
+
+  useEffect(() => {
+    pathsRef.current.forEach(({ path, color }, id) => {
+      const isSelected = selectedFlightId === id;
+      const hasSelection = selectedFlightId !== null;
+      path.setStyle({
+        color,
+        weight: isSelected ? 5 : 2,
+        opacity: isSelected ? 1 : hasSelection ? 0.22 : 0.62,
+      });
+      if (isSelected) path.bringToFront();
+    });
+  }, [selectedFlightId, processedFlights]);
+
+  useEffect(() => {
+    if (!map) return;
+    map.on('click', onMapBackgroundClick);
+    return () => {
+      map.off('click', onMapBackgroundClick);
+    };
+  }, [map, onMapBackgroundClick]);
 
   return (
     <div style={{ height: '100vh', width: '100%' }}>
@@ -257,7 +343,7 @@ const FlightMap: React.FC<FlightMapProps> = ({ flights, airports, onAirportClick
         zoom={MAP_CONFIG.defaultZoom}
         minZoom={MAP_CONFIG.minZoom}
         zoomControl={false} // Disable default zoom control
-        style={{ height: '100%', width: '100%', backgroundColor: isDarkMode ? '#2d3748' : '#ffffff' }}
+        style={{ height: '100%', width: '100%', backgroundColor: isDarkMode ? '#202124' : '#ffffff' }}
         ref={setMap}
         maxBoundsViscosity={MAP_CONFIG.maxBoundsViscosity}
         maxBounds={MAP_CONFIG.maxBounds}

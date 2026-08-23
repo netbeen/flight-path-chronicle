@@ -78,6 +78,7 @@ export const processFlights = (flights: Flight[], airports: Airport[]): Processe
 
   const processedFlights: ProcessedFlight[] = [];
   const baseCurvature = 0.15; // 基础曲率
+  const maxCurvature = 0.6;
 
   // 2. 遍历每个航线组，计算其属性
   flightGroups.forEach((group) => {
@@ -102,7 +103,7 @@ export const processFlights = (flights: Flight[], airports: Airport[]): Processe
 
       // 为组内的每个航班分配递增的曲率，并处理跨日界线的情况
       group.forEach((flight, index) => {
-        const curvature = (index + 1) * baseCurvature;
+        const curvature = Math.min((index + 1) * baseCurvature, maxCurvature);
 
         let arrivalAirportModified;
         // 在新的 [0, 360] 坐标系下，日界线变成了 180 度经线
