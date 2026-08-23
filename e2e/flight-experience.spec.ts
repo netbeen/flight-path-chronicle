@@ -52,6 +52,7 @@ test('纪念模式展示全量生涯数据并可导出 PNG', async ({ page }, te
   await expect(page.getByText('我的职业飞行纪事')).toBeVisible();
   await expect(page.getByText('44', { exact: true })).toBeVisible();
   await expect(page.getByText('111,874')).toBeVisible();
+  await expect(page.getByText(/沿地球赤道飞行/)).toContainText('2.8 圈');
   await expect(page.locator('.career-airport-label')).toHaveCount(30);
   await expect(page.locator('.flight-path-poster')).toHaveCount(44);
 
