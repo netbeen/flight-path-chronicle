@@ -309,6 +309,23 @@ export const getAvailableAirlines = (flights: Flight[]): string[] => {
 };
 
 /**
+ * 获取有航班记录的城市列表，同一城市的多个机场会合并展示。
+ */
+export const getAvailableCities = (flights: Flight[], airports: Airport[]): string[] => {
+  const airportIndex = buildAirportIndex(airports);
+  const cities = new Set<string>();
+
+  flights.forEach((flight) => {
+    const departure = airportIndex.get(flight.departureAirport);
+    const arrival = airportIndex.get(flight.arrivalAirport);
+    if (departure) cities.add(departure.city || departure.name);
+    if (arrival) cities.add(arrival.city || arrival.name);
+  });
+
+  return Array.from(cities).sort((a, b) => a.localeCompare(b, 'zh-CN'));
+};
+
+/**
  * 获取航空公司名称映射（可选）
  */
 export const AIRLINE_NAMES: Record<string, string> = {

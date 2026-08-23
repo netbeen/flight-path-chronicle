@@ -4,9 +4,12 @@ import {
   ChevronDown,
   ChevronUp,
   History,
+  ImageDown,
   MapPin,
   Plane,
   RotateCcw,
+  Search,
+  X,
 } from 'lucide-react';
 import { Airport } from '@/data';
 import {
@@ -23,10 +26,13 @@ interface FloatingStatsPanelProps {
   airlines: string[];
   selectedYear: string | 'all';
   selectedAirline: string | 'all';
+  cityQuery: string;
   onYearChange: (year: string | 'all') => void;
   onAirlineChange: (airline: string | 'all') => void;
+  onCityQueryChange: (query: string) => void;
   onDestinationClick: (code: string) => void;
   onFlightClick: (flight: ProcessedFlight) => void;
+  onOpenCareerMode: () => void;
   selectedFlightId: string | null;
 }
 
@@ -37,10 +43,13 @@ const FloatingStatsPanel: React.FC<FloatingStatsPanelProps> = ({
   airlines,
   selectedYear,
   selectedAirline,
+  cityQuery,
   onYearChange,
   onAirlineChange,
+  onCityQueryChange,
   onDestinationClick,
   onFlightClick,
+  onOpenCareerMode,
   selectedFlightId,
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -65,11 +74,12 @@ const FloatingStatsPanel: React.FC<FloatingStatsPanelProps> = ({
   const clearFilters = () => {
     onYearChange('all');
     onAirlineChange('all');
+    onCityQueryChange('');
   };
 
   return (
     <aside className={`flight-panel absolute z-[1100] transition-[width,max-height] duration-300 ${isCollapsed ? 'is-collapsed' : ''}`}>
-      <div className="h-full overflow-hidden rounded-lg border border-white/10 bg-gray-950/88 text-white shadow-2xl backdrop-blur-md">
+      <div className="flex h-full flex-col overflow-hidden rounded-lg border border-white/10 bg-gray-950/88 text-white shadow-2xl backdrop-blur-md">
         <div className="flex items-center justify-between border-b border-white/10 bg-black/20 p-4">
           <div className="flex items-center gap-2">
             <Plane className="h-5 w-5 text-blue-400" aria-hidden="true" />
@@ -115,7 +125,34 @@ const FloatingStatsPanel: React.FC<FloatingStatsPanelProps> = ({
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 border-b border-white/10 p-4">
+            <div className="space-y-3 border-b border-white/10 p-4">
+              <div className="relative">
+                <label className="mb-1 block text-xs font-semibold text-gray-400" htmlFor="city-filter">城市或机场</label>
+                <Search className="pointer-events-none absolute bottom-2.5 left-3 h-4 w-4 text-gray-500" aria-hidden="true" />
+                <input
+                  id="city-filter"
+                  type="search"
+                  value={cityQuery}
+                  onChange={(event) => {
+                    onCityQueryChange(event.target.value);
+                    if (event.target.value) setActiveTab('history');
+                  }}
+                  placeholder="搜索北京、首都或 PEK"
+                  className="w-full rounded-md border border-white/10 bg-gray-800 py-2 pl-9 pr-9 text-sm placeholder:text-gray-500 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {cityQuery && (
+                  <button
+                    type="button"
+                    onClick={() => onCityQueryChange('')}
+                    className="absolute bottom-1.5 right-1.5 flex h-7 w-7 items-center justify-center rounded text-gray-400 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+                    aria-label="清除城市搜索"
+                    title="清除城市搜索"
+                  >
+                    <X className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="mb-1 block text-xs font-semibold text-gray-400" htmlFor="year-filter">年份</label>
                 <select 
@@ -144,11 +181,24 @@ const FloatingStatsPanel: React.FC<FloatingStatsPanelProps> = ({
                   ))}
                 </select>
               </div>
+              </div>
             </div>
 
-            <div className="panel-scroll custom-scrollbar overflow-y-auto">
+            <div className="panel-scroll custom-scrollbar min-h-0 flex-1 overflow-y-auto">
               {activeTab === 'overview' ? (
                 <div className="space-y-5 p-4" role="tabpanel">
+                  <button
+                    type="button"
+                    onClick={onOpenCareerMode}
+                    className="flex w-full items-center justify-between rounded-md border border-blue-400/20 bg-blue-500/10 px-3 py-3 text-left transition-colors hover:border-blue-300/40 hover:bg-blue-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+                  >
+                    <span>
+                      <span className="block text-sm font-semibold text-blue-100">生成职业飞行纪念图</span>
+                      <span className="mt-0.5 block text-xs text-gray-400">以全部航班生成可下载的全景轨迹</span>
+                    </span>
+                    <ImageDown className="h-5 w-5 flex-shrink-0 text-blue-300" aria-hidden="true" />
+                  </button>
+
                   <div className="grid grid-cols-2 gap-3">
                     <div className="rounded-md border border-white/5 bg-white/5 p-3">
                       <p className="mb-1 text-xs text-gray-400">总里程</p>

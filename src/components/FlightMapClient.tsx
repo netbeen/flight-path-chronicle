@@ -2,14 +2,18 @@
 
 import dynamic from 'next/dynamic';
 import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
+import { toPng } from 'html-to-image';
 import { Flight } from '@/data/flight';
 import { Airport } from '@/data/airport';
 import Sidebar from '@/components/Sidebar';
 import FloatingStatsPanel from '@/components/FloatingStatsPanel';
 import TimelineController from '@/components/TimelineController';
+import CareerPoster from '@/components/CareerPoster';
 import {
+  calculateFlightStatistics,
   getAvailableYears,
   getAvailableAirlines,
+  getAvailableCities,
   processFlights,
   ProcessedFlight,
 } from '@/data/flightProcessor';
@@ -43,10 +47,14 @@ interface FlightMapClientProps {
 export default function FlightMapClient({ flights, airports }: FlightMapClientProps) {
   const [selectedYear, setSelectedYear] = useState<string>('all');
   const [selectedAirline, setSelectedAirline] = useState<string>('all');
+  const [cityQuery, setCityQuery] = useState('');
   const [selectedItem, setSelectedItem] = useState<Airport | ProcessedFlight | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
+  const [isCareerMode, setIsCareerMode] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [mapCommand, setMapCommand] = useState<MapCommand | null>(null);
   const mapCommandId = useRef(0);
+  const captureRef = useRef<HTMLDivElement>(null);
   
   const [currentFlightIndex, setCurrentFlightIndex] = useState<number | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -55,22 +63,50 @@ export default function FlightMapClient({ flights, airports }: FlightMapClientPr
   // 获取所有可选年份和航司
   const years = useMemo(() => getAvailableYears(flights), [flights]);
   const airlines = useMemo(() => getAvailableAirlines(flights), [flights]);
+  const cities = useMemo(() => getAvailableCities(flights, airports), [flights, airports]);
+  const airportIndex = useMemo(
+    () => new Map(airports.map((airport) => [airport.code, airport])),
+    [airports],
+  );
+  const allProcessedFlights = useMemo(
+    () => processFlights(flights, airports).sort(
+      (a, b) => new Date(a.departureTime).getTime() - new Date(b.departureTime).getTime(),
+    ),
+    [flights, airports],
+  );
+  const careerStats = useMemo(
+    () => calculateFlightStatistics(flights, airports),
+    [flights, airports],
+  );
+  const careerYears = useMemo(
+    () => flights.map((flight) => new Date(flight.departureTime).getFullYear()),
+    [flights],
+  );
 
   const filteredFlights = useMemo(() => {
+    const normalizedCityQuery = cityQuery.trim().toLocaleLowerCase('zh-CN');
     const result = flights.filter(flight => {
       const year = new Date(flight.departureTime).getFullYear().toString();
       const airlineCode = flight.flightNumber.substring(0, 2);
+      const departure = airportIndex.get(flight.departureAirport);
+      const arrival = airportIndex.get(flight.arrivalAirport);
       
       const yearMatch = selectedYear === 'all' || year === selectedYear;
       const airlineMatch = selectedAirline === 'all' || airlineCode === selectedAirline;
+      const cityMatch = normalizedCityQuery === '' || [departure, arrival].some((airport) => {
+        if (!airport) return false;
+        return [airport.city, airport.name, airport.code]
+          .filter(Boolean)
+          .some((value) => value!.toLocaleLowerCase('zh-CN').includes(normalizedCityQuery));
+      });
       
-      return yearMatch && airlineMatch;
+      return yearMatch && airlineMatch && cityMatch;
     });
 
     return processFlights(result, airports).sort(
       (a, b) => new Date(a.departureTime).getTime() - new Date(b.departureTime).getTime(),
     );
-  }, [flights, airports, selectedYear, selectedAirline]);
+  }, [flights, airports, airportIndex, selectedYear, selectedAirline, cityQuery]);
 
   const visibleFlights = useMemo(
     () => currentFlightIndex === null
@@ -179,6 +215,64 @@ export default function FlightMapClient({ flights, airports }: FlightMapClientPr
     if (airport) handleAirportClick(airport);
   }, [airports, handleAirportClick]);
 
+  const getCareerBounds = useCallback((): [[number, number], [number, number]] => {
+    const usedCodes = new Set(flights.flatMap((flight) => [
+      flight.departureAirport,
+      flight.arrivalAirport,
+    ]));
+    const usedAirports = airports.filter((airport) => usedCodes.has(airport.code));
+    const latitudes = usedAirports.map((airport) => airport.latitude);
+    const longitudes = usedAirports.map(
+      (airport) => airport.longitude < 0 ? airport.longitude + 360 : airport.longitude,
+    );
+    return [
+      [Math.min(...latitudes), Math.min(...longitudes)],
+      [Math.max(...latitudes), Math.max(...longitudes)],
+    ];
+  }, [airports, flights]);
+
+  const openCareerMode = useCallback(() => {
+    setIsCareerMode(true);
+    setIsPlaying(false);
+    setCurrentFlightIndex(null);
+    setSelectedItem(null);
+    setIsSidebarOpen(false);
+    window.setTimeout(() => {
+      setMapCommand({
+        id: ++mapCommandId.current,
+        type: 'career',
+        bounds: getCareerBounds(),
+      });
+    }, 50);
+  }, [getCareerBounds]);
+
+  const closeCareerMode = useCallback(() => {
+    setIsCareerMode(false);
+    setMapCommand({
+      id: ++mapCommandId.current,
+      type: 'reset',
+    });
+  }, []);
+
+  const downloadCareerPoster = useCallback(async () => {
+    if (!captureRef.current || isExporting) return;
+    setIsExporting(true);
+    try {
+      const dataUrl = await toPng(captureRef.current, {
+        cacheBust: true,
+        pixelRatio: 2,
+        backgroundColor: '#111318',
+        filter: (node) => !(node instanceof HTMLElement && node.dataset.exportIgnore === 'true'),
+      });
+      const link = document.createElement('a');
+      link.download = `flight-path-chronicle-${Math.min(...careerYears)}-${Math.max(...careerYears)}.png`;
+      link.href = dataUrl;
+      link.click();
+    } finally {
+      setIsExporting(false);
+    }
+  }, [careerYears, isExporting]);
+
   const closeSidebar = useCallback(() => {
     setIsSidebarOpen(false);
     setSelectedItem(null);
@@ -194,10 +288,15 @@ export default function FlightMapClient({ flights, airports }: FlightMapClientPr
     setCurrentFlightIndex(null);
     setSelectedItem(null);
     setIsSidebarOpen(false);
-  }, [selectedYear, selectedAirline]);
+  }, [selectedYear, selectedAirline, cityQuery]);
 
   return (
-    <div className="relative h-screen w-full overflow-hidden">
+    <div
+      ref={captureRef}
+      className={`relative h-screen w-full overflow-hidden ${isCareerMode ? 'career-mode' : ''}`}
+    >
+      {!isCareerMode && (
+        <>
         <FloatingStatsPanel 
             flights={filteredFlights}
             airports={airports}
@@ -205,10 +304,13 @@ export default function FlightMapClient({ flights, airports }: FlightMapClientPr
             airlines={airlines}
             selectedYear={selectedYear}
             selectedAirline={selectedAirline}
+            cityQuery={cityQuery}
             onYearChange={setSelectedYear}
             onAirlineChange={setSelectedAirline}
+            onCityQueryChange={setCityQuery}
             onDestinationClick={handleDestinationClick}
             onFlightClick={handleFlightClick}
+            onOpenCareerMode={openCareerMode}
             selectedFlightId={selectedFlightId}
         />
 
@@ -230,15 +332,31 @@ export default function FlightMapClient({ flights, airports }: FlightMapClientPr
             airports={airports}
             onFlightClick={handleFlightClick}
         />
+        </>
+      )}
+
+        {isCareerMode && careerYears.length > 0 && (
+          <CareerPoster
+            totalFlights={careerStats.totalFlights}
+            totalDistance={careerStats.totalDistance}
+            cityCount={cities.length}
+            startYear={Math.min(...careerYears)}
+            endYear={Math.max(...careerYears)}
+            isExporting={isExporting}
+            onDownload={downloadCareerPoster}
+            onClose={closeCareerMode}
+          />
+        )}
 
         <FlightMap 
-            flights={visibleFlights}
+            flights={isCareerMode ? allProcessedFlights : visibleFlights}
             airports={airports} 
             onAirportClick={handleAirportClick}
             onFlightClick={handleFlightClick}
             onMapBackgroundClick={handleMapBackgroundClick}
             mapCommand={mapCommand}
             selectedFlightId={selectedFlightId}
+            careerMode={isCareerMode}
         />
     </div>
   );

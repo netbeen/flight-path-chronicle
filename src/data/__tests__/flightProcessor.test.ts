@@ -2,6 +2,7 @@ import {
   processFlights,
   calculateAirportActivity,
   calculateFlightStatistics,
+  getAvailableCities,
   getAvailableYears
 } from '../flightProcessor';
 import { Flight } from '../flight';
@@ -128,6 +129,21 @@ describe('flightProcessor', () => {
           const years = getAvailableYears(mockFlights);
           expect(years).toContain('2023');
           expect(years).toHaveLength(1);
+      });
+  });
+
+  describe('getAvailableCities', () => {
+      it('should merge multiple airports in the same city', () => {
+          const airports: Airport[] = [
+              ...mockAirports,
+              { code: 'PKX', name: 'Beijing Daxing', latitude: 39.5, longitude: 116.4, city: 'Beijing' },
+          ];
+          const flights: Flight[] = [
+              mockFlights[0],
+              { ...mockFlights[0], departureAirport: 'PKX', flightNumber: 'CA5678' },
+          ];
+
+          expect(getAvailableCities(flights, airports)).toEqual(['Beijing', 'Shanghai']);
       });
   });
 });

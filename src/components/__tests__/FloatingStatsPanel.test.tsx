@@ -39,10 +39,13 @@ const renderPanel = (
     airlines={['MF']}
     selectedYear="all"
     selectedAirline="all"
+    cityQuery=""
     onYearChange={jest.fn()}
     onAirlineChange={jest.fn()}
+    onCityQueryChange={jest.fn()}
     onDestinationClick={onDestinationClick}
     onFlightClick={onFlightClick}
+    onOpenCareerMode={jest.fn()}
     selectedFlightId={null}
   />,
 );
@@ -73,5 +76,34 @@ describe('FloatingStatsPanel', () => {
     expect(onFlightClick).toHaveBeenCalledWith(
       expect.objectContaining({ flightNumber: 'MF8704' }),
     );
+  });
+
+  it('switches to trip results when a city query is entered', () => {
+    const onCityQueryChange = jest.fn();
+    render(
+      <FloatingStatsPanel
+        flights={processedFlights}
+        airports={airports}
+        years={['2025', '2024']}
+        airlines={['MF']}
+        selectedYear="all"
+        selectedAirline="all"
+        cityQuery=""
+        onYearChange={jest.fn()}
+        onAirlineChange={jest.fn()}
+        onCityQueryChange={onCityQueryChange}
+        onDestinationClick={jest.fn()}
+        onFlightClick={jest.fn()}
+        onOpenCareerMode={jest.fn()}
+        selectedFlightId={null}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText('城市或机场'), {
+      target: { value: '新加坡' },
+    });
+
+    expect(onCityQueryChange).toHaveBeenCalledWith('新加坡');
+    expect(screen.getByRole('tab', { name: /行程/ }).getAttribute('aria-selected')).toBe('true');
   });
 });

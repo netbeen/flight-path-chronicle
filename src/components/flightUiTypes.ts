@@ -15,6 +15,11 @@ export type MapCommand =
     }
   | {
       id: number;
+      type: 'career';
+      bounds: LatLngBoundsExpression;
+    }
+  | {
+      id: number;
       type: 'reset';
     };
 

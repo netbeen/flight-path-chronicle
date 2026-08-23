@@ -12,6 +12,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "html-to-image": "^1.11.13",
     "leaflet": "^1.9.4",
     "leaflet-polylinedecorator": "^1.6.0",
     "lucide-react": "^1.33.0",

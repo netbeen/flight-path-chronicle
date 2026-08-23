@@ -65,6 +65,7 @@ interface FlightMapProps {
   onMapBackgroundClick: () => void;
   mapCommand: MapCommand | null;
   selectedFlightId: string | null;
+  careerMode: boolean;
 }
 
 const FlightMap: React.FC<FlightMapProps> = ({
@@ -75,6 +76,7 @@ const FlightMap: React.FC<FlightMapProps> = ({
   onMapBackgroundClick,
   mapCommand,
   selectedFlightId,
+  careerMode,
 }) => {
   // 将地图中心点调整为中国，以满足用户需求
   const center: L.LatLngExpression = MAP_CONFIG.defaultCenter;
@@ -125,12 +127,13 @@ const FlightMap: React.FC<FlightMapProps> = ({
         animate: !reduceMotion,
         duration: reduceMotion ? 0 : 0.8,
       });
-    } else if (mapCommand.type === 'flight') {
+    } else if (mapCommand.type === 'flight' || mapCommand.type === 'career') {
       map.fitBounds(mapCommand.bounds, {
         animate: !reduceMotion,
         duration: reduceMotion ? 0 : 0.8,
-        padding: [80, 80],
-        maxZoom: 6,
+        paddingTopLeft: mapCommand.type === 'career' ? [60, 180] : [80, 80],
+        paddingBottomRight: mapCommand.type === 'career' ? [60, 110] : [80, 80],
+        maxZoom: mapCommand.type === 'career' ? 4 : 6,
       });
     } else {
       map.flyTo(MAP_CONFIG.defaultCenter, MAP_CONFIG.defaultZoom, {
@@ -192,7 +195,10 @@ const FlightMap: React.FC<FlightMapProps> = ({
       if (airport) {
         const size = Math.min(34, 12 + Math.sqrt(count) * 3);
         const icon = L.divIcon({
-          html: `<div class="airport-highlight cursor-pointer"></div>`,
+          html: `
+            <div class="airport-highlight cursor-pointer"></div>
+            ${careerMode ? `<div class="career-airport-label">${airport.code}<span>${count}</span></div>` : ''}
+          `,
           className: '',
           iconSize: [size, size],
           iconAnchor: [size / 2, size / 2],
@@ -251,10 +257,10 @@ const FlightMap: React.FC<FlightMapProps> = ({
         const path = L.polyline(polylinePoints, {
           color: flight.color, // 使用处理后的颜色
           weight: 2,
-          opacity: 0.7,
+          opacity: careerMode ? 0.78 : 0.62,
           interactive: false,
-          dashArray: '10, 10', // 设置虚线
-          className: 'flight-path-animated', // 应用 CSS 动画类名
+          dashArray: careerMode ? '7, 7' : '10, 10',
+          className: careerMode ? 'flight-path-poster' : 'flight-path-animated',
         }).addTo(map);
 
         const hitArea = L.polyline(polylinePoints, {
@@ -313,7 +319,7 @@ const FlightMap: React.FC<FlightMapProps> = ({
         });
       }
     });
-  }, [map, processedFlights, airportActivity, airports, onAirportClick, onFlightClick]); // 3. 添加 map 到依赖数组
+  }, [map, processedFlights, airportActivity, airports, onAirportClick, onFlightClick, careerMode]);
 
   useEffect(() => {
     pathsRef.current.forEach(({ path, color }, id) => {
@@ -337,7 +343,7 @@ const FlightMap: React.FC<FlightMapProps> = ({
   }, [map, onMapBackgroundClick]);
 
   return (
-    <div style={{ height: '100vh', width: '100%' }}>
+    <div className={careerMode ? 'career-map' : ''} style={{ height: '100vh', width: '100%' }}>
       <MapContainer
         center={center}
         zoom={MAP_CONFIG.defaultZoom}
@@ -351,8 +357,9 @@ const FlightMap: React.FC<FlightMapProps> = ({
         // worldCopyJump={true} 
       >
         <TileLayer
+          crossOrigin="anonymous"
           url={
-            isDarkMode
+            isDarkMode || careerMode
               ? MAP_CONFIG.tileProviders.dark
               : MAP_CONFIG.tileProviders.light
           }
