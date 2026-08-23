@@ -6,7 +6,11 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import 'leaflet-polylinedecorator';
 import { Airport, Flight } from '@/data';
-import { processFlights, calculateAirportActivity, ProcessedFlight } from '@/data/flightProcessor';
+import {
+  processFlights,
+  calculateAirportActivity,
+  ProcessedFlight,
+} from '@/data/flightProcessor';
 import { MAP_CONFIG } from '@/config/mapConfig';
 import { getFlightId, MapCommand } from '@/components/flightUiTypes';
 import { getRouteVisualMetrics } from '@/components/mapVisualScale';
@@ -200,7 +204,7 @@ const FlightMap: React.FC<FlightMapProps> = ({
         const icon = L.divIcon({
           html: `
             <div class="airport-highlight cursor-pointer"></div>
-            ${careerMode ? `<div class="career-airport-label">${airport.code}<span>${count}</span></div>` : ''}
+            ${careerMode ? `<div class="career-airport-label" aria-label="${airport.code}，抵达 ${count} 次">${airport.code}<span>${count}</span></div>` : ''}
           `,
           className: '',
           iconSize: [size, size],

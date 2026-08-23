@@ -17,14 +17,13 @@ export interface ProcessedFlight extends Flight {
 }
 
 /**
- * 计算机场的起降次数
+ * 计算机场的抵达次数
  * @param flights 原始航班数据列表
- * @returns 返回一个Map，key为机场代码，value为总起降次数
+ * @returns 返回一个Map，key为机场代码，value为抵达次数
  */
 export const calculateAirportActivity = (flights: Flight[]): Map<string, number> => {
   const activityMap = new Map<string, number>();
   flights.forEach(flight => {
-    activityMap.set(flight.departureAirport, (activityMap.get(flight.departureAirport) || 0) + 1);
     activityMap.set(flight.arrivalAirport, (activityMap.get(flight.arrivalAirport) || 0) + 1);
   });
   return activityMap;

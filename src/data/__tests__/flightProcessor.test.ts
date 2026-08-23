@@ -27,11 +27,11 @@ const mockFlights: Flight[] = [
 
 describe('flightProcessor', () => {
   describe('calculateAirportActivity', () => {
-    it('should calculate airport activity correctly', () => {
+    it('should calculate airport activity from arrivals only', () => {
       const activity = calculateAirportActivity(mockFlights);
-      expect(activity.get('PEK')).toBe(2);
-      expect(activity.get('PVG')).toBe(2);
-      expect(activity.get('NRT')).toBe(1);
+      expect(activity.get('PEK')).toBe(1);
+      expect(activity.get('PVG')).toBe(1);
+      expect(activity.get('NRT')).toBeUndefined();
       expect(activity.get('LAX')).toBe(1);
     });
   });

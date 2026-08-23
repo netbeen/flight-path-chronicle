@@ -60,6 +60,9 @@ test('全景模式展示完整飞行数据并可导出 PNG', async ({ page }, te
   await expect(page.getByText('最高频率航线')).toBeVisible();
   await expect(page.getByText(/新加坡樟宜 → 杭州萧山/)).toContainText('8 段');
   await expect(page.locator('.career-airport-label')).toHaveCount(30);
+  await expect(page.locator('.career-airport-label[aria-label="HGH，抵达 16 次"]')).toHaveCount(3);
+  await expect(page.locator('.career-airport-label[aria-label="SIN，抵达 12 次"]')).toHaveCount(3);
+  await expect(page.locator('.career-airport-label[aria-label="SEA，抵达 1 次"]')).toHaveCount(3);
   await expect(page.locator('.flight-path-poster')).toHaveCount(44);
 
   const downloadPromise = page.waitForEvent('download');
@@ -105,12 +108,17 @@ test('航线宽度随地图缩放保持相对一致', async ({ page }) => {
   const baselineWeight = Number(await route.getAttribute('stroke-width'));
 
   await zoomOut.click();
-  await zoomOut.click();
   await expect.poll(async () => Number(await route.getAttribute('stroke-width'))).toBeLessThan(baselineWeight);
+  const oneLevelOutWeight = Number(await route.getAttribute('stroke-width'));
+  await zoomOut.click();
+  await expect.poll(async () => Number(await route.getAttribute('stroke-width'))).toBeLessThan(oneLevelOutWeight);
   const zoomedOutWeight = Number(await route.getAttribute('stroke-width'));
 
   await zoomIn.click();
+  await expect.poll(async () => Number(await route.getAttribute('stroke-width'))).toBeGreaterThan(zoomedOutWeight);
+  const oneLevelRestoredWeight = Number(await route.getAttribute('stroke-width'));
   await zoomIn.click();
+  await expect.poll(async () => Number(await route.getAttribute('stroke-width'))).toBeGreaterThan(oneLevelRestoredWeight);
   await expect.poll(async () => Number(await route.getAttribute('stroke-width'))).toBeCloseTo(baselineWeight, 3);
   const restoredWeight = Number(await route.getAttribute('stroke-width'));
 
